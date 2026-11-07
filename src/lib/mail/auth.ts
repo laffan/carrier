@@ -42,6 +42,9 @@ export interface Identity {
 /** Carrier's app registration with Google, fixed at build time (vite.config.ts checks it). */
 const GOOGLE_APP_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "").trim();
 
+/** False when this build has no Google app registration (sign-in disabled). */
+export const googleSignInAvailable = GOOGLE_APP_ID.length > 0;
+
 /** Maps Google's error codes to messages a person can act on. */
 function friendlyError(code: string, description?: string | null): string {
   switch (code) {
@@ -99,7 +102,9 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
 /** Shows Google's sign-in page and returns the account that signed in. */
 export async function signIn(loginHint?: string): Promise<Identity> {
   if (!isTauri) throw new AuthError("Adding accounts needs the Carrier app; the browser preview runs in demo mode.");
-  if (!GOOGLE_APP_ID) throw new AuthError("This build of Carrier wasn't set up for Google sign-in.");
+  if (!GOOGLE_APP_ID) {
+    throw new AuthError("Google sign-in isn't set up in this build yet (VITE_GOOGLE_CLIENT_ID). See the README's one-time registration step.");
+  }
   let tokens = await authorize("select_account", loginHint);
   // Google normally returns a long-lived token for installed apps. If it
   // didn't (e.g. a previous grant exists), ask once more with the consent page.

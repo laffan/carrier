@@ -6,12 +6,12 @@ const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
-  // Native builds (tauri dev/build, ios dev/build) need Carrier's Google app
-  // registration compiled in, otherwise "Sign in with Google" can't work.
-  // The browser preview (`npm run dev`) runs in demo mode and doesn't.
+  // Without Carrier's Google app registration the app still runs, but only
+  // with sample mail; "Sign in with Google" explains what is missing.
   if (process.env.TAURI_ENV_PLATFORM && !env.VITE_GOOGLE_CLIENT_ID) {
-    throw new Error(
-      "VITE_GOOGLE_CLIENT_ID is not set. Carrier's one-time Google app registration is missing; see README › “One-time: register Carrier with Google”.",
+    console.warn(
+      "\n[carrier] VITE_GOOGLE_CLIENT_ID is not set: Google sign-in is disabled (sample mail only).\n" +
+        "          See README › “One-time: register Carrier with Google”.\n",
     );
   }
   return {

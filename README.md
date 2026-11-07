@@ -9,7 +9,7 @@ Version 0.1 aims to match the everyday Gmail app with less on screen. The one de
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Runs the UI in a browser at http://127.0.0.1:1420 in **demo mode**, with two in-memory accounts and no Google sign-in. Use this to work on the interface. |
-| `npm run tauri dev` | Runs the macOS desktop app with real Gmail (needs the one-time registration below). |
+| `npm run tauri dev` | Runs the macOS desktop app. Signing in to Gmail needs the one-time registration below; until then, use *Try with sample mail*. |
 | `npm run tauri ios dev` | Runs on an iPad simulator or a connected iPad (setup below). |
 | `npm test` | Unit tests for MIME, Markdown, address parsing and PKCE. |
 | `npm run check` | Type-checks the Svelte and TypeScript code. |
@@ -25,7 +25,7 @@ Version 0.1 aims to match the everyday Gmail app with less on screen. The one de
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 ```
 
-- Node 20 or newer, then:
+- Node 22.13 or newer, then:
 
 ```bash
 npm install
@@ -42,7 +42,7 @@ To show that sign-in page, Google requires every third-party mail app to identif
 3. Under **Google Auth Platform › Branding / Audience**, set the app name to "Carrier", choose user type **External**, then set the publishing status to **In production**. Don't submit for verification.
 4. Under **Data access**, add these scopes: `https://mail.google.com/`, `.../auth/contacts.readonly`, `.../auth/contacts.other.readonly`, `openid`, `email` and `profile`.
 5. Under **Clients**, create a client: type **iOS**, bundle ID `app.carrier.mail` (the `identifier` in `src-tauri/tauri.conf.json`). The same ID also works for the macOS build.
-6. Put the ID in `.env`. `tauri dev`, `tauri build` and the `ios` commands refuse to build without it:
+6. Put the ID in `.env` and restart `tauri dev`. Without it the app still runs, but Google sign-in is disabled; use **Try with sample mail** on the welcome screen to explore the interface:
 
 ```bash
 cp .env.example .env

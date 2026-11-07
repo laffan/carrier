@@ -5,6 +5,7 @@
   import { markdownToHtml } from "../lib/mail/markdown";
   import { settings, SWIPE_LABELS, type SwipeAction } from "../lib/settings.svelte";
   import Sheet from "./Sheet.svelte";
+  import { isTauri } from "../lib/platform";
 
   interface Props {
     onclose: () => void;
@@ -63,7 +64,11 @@
           {/if}
         </div>
       {/each}
-      {#if !app.demo}<button class="text-btn add" onclick={() => app.addAccount()}>Add Google account</button>{/if}
+      {#if app.demo && isTauri}
+        <p class="note">You're looking at sample mail.</p>
+        <button class="text-btn add" onclick={() => (onclose(), app.exitDemo())}>Leave sample mail</button>
+      {/if}
+      {#if isTauri}<button class="text-btn add" onclick={() => app.addAccount()}>Add Google account</button>{/if}
     </section>
 
     <section>

@@ -54,7 +54,8 @@ const PAGE = 30;
 
 class App {
   ready = $state(false);
-  demo = !isTauri;
+  /** Sample mailboxes: always in a plain browser; on request inside the app. */
+  demo = $state(!isTauri);
   accounts = $state<Account[]>([]);
   current = $state<string>(ALL);
   view = $state<View>({ kind: "label", label: "INBOX" });
@@ -84,13 +85,9 @@ class App {
 
   async init() {
     await settings.load();
+    if (isTauri && (await kvGet<boolean>("demo"))) this.demo = true;
     if (this.demo) {
-      this.accounts = [
-        { email: "you@example.com", name: "Alex Rivera", sendAs: [] },
-        { email: "work@example.org", name: "Alex Rivera", sendAs: [] },
-      ];
-      this.backends.set("you@example.com", new DemoBackend("you@example.com", "Alex Rivera", 0));
-      this.backends.set("work@example.org", new DemoBackend("work@example.org", "Alex Rivera", 1));
+      this.loadDemoAccounts();
     } else {
       const saved = (await kvGet<Account[]>("accounts")) ?? [];
       this.accounts = saved;
@@ -105,6 +102,48 @@ class App {
     }
     this.ready = true;
     if (this.accounts.length) {
+      this.loadList();
+      this.refreshAccounts();
+    }
+  }
+
+  private loadDemoAccounts() {
+    this.accounts = [
+      { email: "you@example.com", name: "Alex Rivera", sendAs: [] },
+      { email: "work@example.org", name: "Alex Rivera", sendAs: [] },
+    ];
+    this.backends.clear();
+    this.backends.set("you@example.com", new DemoBackend("you@example.com", "Alex Rivera", 0));
+    this.backends.set("work@example.org", new DemoBackend("work@example.org", "Alex Rivera", 1));
+  }
+
+  /** Opens the app with sample mail (no Google account needed). */
+  async startDemo() {
+    this.demo = true;
+    await kvSet("demo", true);
+    this.loadDemoAccounts();
+    this.current = ALL;
+    this.view = { kind: "label", label: "INBOX" };
+    this.loadList();
+    this.refreshAccounts();
+  }
+
+  /** Leaves sample mail and returns to the real (possibly empty) account list. */
+  async exitDemo() {
+    if (!isTauri) return;
+    await kvSet("demo", false);
+    this.demo = false;
+    this.closeThread();
+    this.threads = [];
+    this.labels = {};
+    this.backends.clear();
+    this.summaryCache.clear();
+    const saved = (await kvGet<Account[]>("accounts")) ?? [];
+    this.accounts = saved;
+    for (const a of saved) this.backends.set(a.email, new GmailBackend(a.email));
+    this.current = saved.length > 1 ? ALL : (saved[0]?.email ?? ALL);
+    this.view = { kind: "label", label: "INBOX" };
+    if (saved.length) {
       this.loadList();
       this.refreshAccounts();
     }
@@ -157,6 +196,7 @@ class App {
   async addAccount(loginHint?: string) {
     try {
       const id = await signIn(loginHint);
+      if (this.demo && isTauri) await this.exitDemo();
       const existing = this.accounts.findIndex((a) => a.email === id.email);
       const acct: Account = { email: id.email, name: id.name, picture: id.picture, sendAs: [] };
       if (existing >= 0) this.accounts[existing] = { ...this.accounts[existing], ...acct, needsReauth: false };

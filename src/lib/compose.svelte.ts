@@ -99,7 +99,6 @@ class Composer {
   draft = $state<Draft | null>(null);
   saving = $state(false);
   lastSaved = $state<number | null>(null);
-  preview = $state(false);
   loadingAttachments = $state(false);
   private savedHash = "";
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -144,7 +143,6 @@ class Composer {
     if (this.draft) await this.close();
     const signature = await this.signatureFor(d.from.email);
     this.draft = { ...d, signature, includeSignature: true };
-    this.preview = false;
     this.lastSaved = null;
     this.savedHash = this.hash();
   }
@@ -304,8 +302,7 @@ class Composer {
         if (this.draft?.draftId === ref.draftId) this.draft.attachments = loaded;
         this.loadingAttachments = false;
       }
-      this.preview = false;
-      this.savedHash = this.hash();
+        this.savedHash = this.hash();
     } catch (e) {
       this.loadingAttachments = false;
       app.handleError(e, account);
@@ -391,13 +388,6 @@ class Composer {
   private build(d: Draft): string {
     const out = this.outgoing(d);
     return buildMime(out, renderOutgoing(out));
-  }
-
-  /** Rendered HTML for the preview pane. */
-  previewHtml(): string {
-    const d = this.draft;
-    if (!d) return "";
-    return renderOutgoing(this.outgoing(d)).html;
   }
 
   async save(): Promise<void> {

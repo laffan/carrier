@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { app, threadKey } from "./lib/app.svelte";
   import { composer } from "./lib/compose.svelte";
-  import Compose from "./components/Compose.svelte";
+  // The composer (with CodeMirror) loads on first use to keep startup light.
+  const loadCompose = () => import("./components/Compose.svelte");
   import Onboarding from "./components/Onboarding.svelte";
   import Settings from "./components/Settings.svelte";
   import Sidebar from "./components/Sidebar.svelte";
@@ -184,7 +185,9 @@
 {/if}
 
 {#if composer.draft}
-  <Compose />
+  {#await loadCompose() then { default: Compose }}
+    <Compose />
+  {/await}
 {/if}
 
 {#if settingsOpen}

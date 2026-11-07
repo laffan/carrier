@@ -14,6 +14,8 @@ export interface Settings {
   defaultReply: "reply" | "replyAll";
   /** Markdown signatures keyed by send-as address. */
   signatures: Record<string, string>;
+  /** Colour chosen for each account (keyed by email); defaults by position. */
+  accountColors: Record<string, string>;
   /** Whether a signature was imported/edited at least once (otherwise Gmail's is used). */
   signaturesCustomized: Record<string, boolean>;
 }
@@ -27,12 +29,29 @@ export const DEFAULTS: Settings = {
   theme: "system",
   defaultReply: "reply",
   signatures: {},
+  accountColors: {},
   signaturesCustomized: {},
 };
 
 class SettingsStore {
   value = $state<Settings>({ ...DEFAULTS });
   loaded = $state(false);
+  /** Whether the system currently prefers dark mode. */
+  systemDark = $state(false);
+
+  /** Effective appearance, combining the setting with the system preference. */
+  get dark(): boolean {
+    const t = this.value.theme;
+    return t === "dark" || (t === "system" && this.systemDark);
+  }
+
+  constructor() {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      this.systemDark = mq.matches;
+      mq.addEventListener?.("change", (e) => (this.systemDark = e.matches));
+    }
+  }
 
   async load() {
     const saved = await kvGet<Partial<Settings>>("settings");
@@ -64,3 +83,6 @@ export const SWIPE_LABELS: Record<SwipeAction, string> = {
   star: "Star",
   none: "None",
 };
+
+/** Account colours: distinct, readable in light and dark mode. */
+export const ACCOUNT_COLORS = ["#4a7dff", "#e58a3c", "#33a873", "#a865d8", "#e0566f", "#2aa6b8", "#c8a228", "#7d8b9b"];

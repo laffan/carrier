@@ -9,7 +9,7 @@ import { DemoBackend } from "./mail/demo";
 import { GmailBackend } from "./mail/gmail";
 import type { Label, MailBackend, SendAs, Thread, ThreadSummary } from "./mail/types";
 import { cacheGet, cacheSet, isTauri, kvGet, kvSet } from "./platform";
-import { settings } from "./settings.svelte";
+import { ACCOUNT_COLORS, settings } from "./settings.svelte";
 import { toasts } from "./toasts.svelte";
 
 export interface Account {
@@ -153,6 +153,24 @@ class App {
     const b = this.backends.get(email);
     if (!b) throw new Error(`Unknown account ${email}`);
     return b;
+  }
+
+  /** The account's colour: the one picked in Settings, else by position. */
+  accountColor(email: string): string {
+    const chosen = settings.value.accountColors[email];
+    if (chosen) return chosen;
+    const taken = new Set(Object.values(settings.value.accountColors));
+    const free = ACCOUNT_COLORS.filter((c) => !taken.has(c));
+    const idx = Math.max(0, this.accounts.findIndex((a) => a.email === email));
+    const pool = free.length ? free : ACCOUNT_COLORS;
+    return pool[idx % pool.length];
+  }
+
+  setAccountColor(email: string, color: string) {
+    // Pin every account's current colour first so others don't shift.
+    const pinned: Record<string, string> = {};
+    for (const a of this.accounts) pinned[a.email] = this.accountColor(a.email);
+    settings.update({ accountColors: { ...pinned, [email]: color } });
   }
 
   account(email: string): Account | undefined {

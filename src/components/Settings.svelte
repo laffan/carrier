@@ -3,7 +3,7 @@
   import { app } from "../lib/app.svelte";
   import { composer, htmlToMarkdown } from "../lib/compose.svelte";
   import { markdownToHtml } from "../lib/mail/markdown";
-  import { settings, SWIPE_LABELS, type SwipeAction } from "../lib/settings.svelte";
+  import { ACCOUNT_COLORS, settings, SWIPE_LABELS, type SwipeAction } from "../lib/settings.svelte";
   import Sheet from "./Sheet.svelte";
   import { isTauri } from "../lib/platform";
 
@@ -57,6 +57,19 @@
           <div class="grow">
             <div>{a.email}</div>
             {#if a.needsReauth}<div class="sub warn">Needs to sign in again</div>{:else if a.name}<div class="sub">{a.name}</div>{/if}
+            <div class="swatches" role="radiogroup" aria-label="Colour for {a.email}">
+              {#each ACCOUNT_COLORS as c}
+                <button
+                  class="swatch"
+                  class:on={app.accountColor(a.email) === c}
+                  style:background={c}
+                  role="radio"
+                  aria-checked={app.accountColor(a.email) === c}
+                  aria-label="Colour {c}"
+                  onclick={() => app.setAccountColor(a.email, c)}
+                ></button>
+              {/each}
+            </div>
           </div>
           {#if a.needsReauth}<button class="text-btn" onclick={() => app.addAccount(a.email)}>Sign in</button>{/if}
           {#if !app.demo}
@@ -214,6 +227,22 @@
   .sub {
     font-size: 12.5px;
     color: var(--text-2);
+  }
+  .swatches {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  }
+  .swatch.on {
+    box-shadow:
+      0 0 0 2px var(--bg),
+      0 0 0 3.5px var(--text-2);
   }
   .warn {
     color: var(--danger);

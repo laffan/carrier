@@ -111,25 +111,36 @@
     return { body: doc.body.innerHTML, hasQuote, blocked, rich };
   });
 
-  const dark = $derived.by(() => {
-    void settings.value.theme;
-    return typeof window !== "undefined" && getComputedStyle(document.documentElement).colorScheme === "dark";
-  });
+  const dark = $derived(settings.dark);
 
+  /**
+   * Messages always sit directly on the app background (no white card).
+   * - Simple messages take the app's text colours.
+   * - Designed (HTML/newsletter) messages keep their own colours in light
+   *   mode; in dark mode they are colour-inverted with images restored, so
+   *   dark text on a white design becomes light text on the dark background.
+   * The frame's color-scheme always matches the app's: when they differ,
+   * WebKit paints an opaque white backdrop behind the frame.
+   */
   const srcdoc = $derived.by(() => {
     const p = prepared;
-    const themed = !p.rich;
-    const fg = themed && dark ? "#e6e6e6" : "#1d1d1f";
-    const link = themed && dark ? "#8fb0ff" : "#1a5fb4";
+    const scheme = dark ? "dark" : "light";
+    const invert = dark && p.rich;
+    const fg = dark && !p.rich ? "#e6e6e6" : "#1d1d1f";
+    const link = dark && !p.rich ? "#8fb0ff" : "#1a5fb4";
+    const bg = "transparent";
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<meta name="color-scheme" content="${scheme}">
 <style>
-  html,body{margin:0;padding:0;background:${themed ? "transparent" : "#fff"};}
+  :root{color-scheme:${scheme};}
+  html,body{margin:0;padding:0;background:${bg};}
+  ${invert ? "html{filter:invert(1) hue-rotate(180deg);} img,video,picture,svg,[style*='background-image'],[background]{filter:invert(1) hue-rotate(180deg);}" : ""}
   body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif;color:${fg};
-       word-wrap:break-word;overflow-wrap:anywhere;-webkit-text-size-adjust:100%;padding:${themed ? "0" : "12px"};}
+       word-wrap:break-word;overflow-wrap:anywhere;-webkit-text-size-adjust:100%;}
   a{color:${link}}
   img{max-width:100%;height:auto}
   pre{white-space:pre-wrap}
-  blockquote{margin:0 0 0 .8ex;padding-left:1ex;border-left:1px solid #ccc}
+  blockquote{margin:0 0 0 .8ex;padding-left:1ex;border-left:1px solid ${dark && !p.rich ? "#555" : "#ccc"}}
   [data-carrier-quote]{display:none !important}
   .show-quoted [data-carrier-quote]{display:revert !important}
   table{max-width:none}
@@ -185,7 +196,7 @@
   {srcdoc}
   {onload}
   style:height="{height}px"
-  class:rich={prepared.rich}
+  style:color-scheme={dark ? "dark" : "light"}
 ></iframe>
 {#if prepared.hasQuote}
   <button class="quote" aria-label={showQuoted ? "Hide quoted text" : "Show quoted text"} onclick={() => (showQuoted = !showQuoted)}>
@@ -199,11 +210,6 @@
     width: 100%;
     border: none;
     background: transparent;
-    color-scheme: normal;
-  }
-  iframe.rich {
-    border-radius: 10px;
-    background: #fff;
   }
   .quote {
     display: inline-flex;

@@ -80,7 +80,7 @@
         {/if}
         {#each app.accounts as a (a.email)}
           <button class="item" class:active={app.current === a.email} onclick={() => pickAccount(a.email)}>
-            <span class="ellipsis">{a.email}</span>
+            <span class="ellipsis with-dot"><span class="dot" style:background={app.accountColor(a.email)}></span>{a.email}</span>
             {#if a.needsReauth}
               <span class="warn" title="Sign in again"><CircleAlert size={15} strokeWidth={1.8} /></span>
             {:else}
@@ -254,6 +254,17 @@
     font-size: 12px;
     color: var(--text-2);
     font-variant-numeric: tabular-nums;
+  }
+  .with-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
   }
   .warn {
     color: var(--danger);

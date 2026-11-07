@@ -115,10 +115,9 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
   | `u` or `esc` | Back |
   | `g` then `i` / `s` / `t` / `d` / `a` | Go to Inbox / Starred / Sent / Drafts / All mail |
   | `⌘↩` | Send |
-  | `⌘⇧P` | Preview |
-  | `⌘B` / `⌘I` / `⌘K` | Bold / italic / link (in the editor) |
+  | `⌘B` / `⌘I` / `⌘K` / `⌘E` / `⌘⇧X` | Bold / italic / link / code / strikethrough (in the editor) |
 
-- **Appearance.** Light, dark and system themes. Two panes on a landscape iPad or a Mac, and a persistent sidebar on wide screens.
+- **Appearance.** Light, dark and system themes. Messages always sit on the app background; in dark mode, designed HTML mail is colour-inverted (images kept) so it stays readable. Each account has a colour, shown as a pill beside its messages (change it in Settings). Two panes on a landscape iPad or a Mac, and a persistent sidebar on wide screens.
 
 ### Markdown
 
@@ -126,7 +125,7 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
 - Single line breaks are kept, as people expect in email.
 - Styles are inlined so the result looks right in Gmail, Outlook and Apple Mail.
 - The text/plain alternative is the Markdown source followed by `-- ` and the signature. Replies add a `>`-quoted history.
-- Use the eye button (⌘⇧P) to preview exactly what will be sent.
+- The editor (CodeMirror 6) shows formatting as you type. Markers such as `**`, `#` and link URLs are hidden except where the cursor is, so they stay editable. Lists continue when you press Return.
 
 ### Not in v0.1
 

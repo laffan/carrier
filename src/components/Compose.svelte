@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { X, Paperclip, Eye, PenLine, Trash2, ChevronDown, ArrowUp } from "@lucide/svelte";
+  import { X, Paperclip, Trash2, ChevronDown, ArrowUp } from "@lucide/svelte";
   import { app } from "../lib/app.svelte";
   import { composer, type FromOption } from "../lib/compose.svelte";
   import { markdownToHtml } from "../lib/mail/markdown";
   import { formatBytes } from "../lib/util";
   import MailBody from "./MailBody.svelte";
+  import MarkdownEditor from "./MarkdownEditor.svelte";
   import Popover from "./Popover.svelte";
   import RecipientField from "./RecipientField.svelte";
   import Sheet from "./Sheet.svelte";
@@ -12,7 +13,6 @@
   const d = $derived(composer.draft!);
   let showCc = $state(false);
   let fileInput = $state<HTMLInputElement>();
-  let textarea = $state<HTMLTextAreaElement>();
   let fromOpen = $state(false);
   let fromAnchor = $state<HTMLElement>();
   let showQuote = $state(false);
@@ -27,54 +27,15 @@
     if (d.cc.length || d.bcc.length) showCc = true;
   });
 
-  // Focus: recipients for new mail, body for replies.
-  $effect(() => {
-    if ((d.mode === "reply" || d.mode === "replyAll") && textarea) {
-      textarea.focus();
-      textarea.setSelectionRange(0, 0);
-    }
-  });
-
   function changed() {
     composer.scheduleSave();
   }
-
-  function autosize() {
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = Math.max(180, textarea.scrollHeight) + "px";
-  }
-
-  $effect(() => {
-    void d.markdown;
-    void composer.preview;
-    queueMicrotask(autosize);
-  });
 
   function onkeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       composer.send();
-    } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "p" || e.key === "P")) {
-      e.preventDefault();
-      composer.preview = !composer.preview;
     }
-  }
-
-  /** Minimal Markdown helpers for hardware keyboards: ⌘B, ⌘I, ⌘K. */
-  function onTextKey(e: KeyboardEvent) {
-    if (!(e.metaKey || e.ctrlKey) || !textarea) return;
-    const wrap = (before: string, after = before) => {
-      e.preventDefault();
-      const { selectionStart: s, selectionEnd: en, value } = textarea!;
-      const sel = value.slice(s, en);
-      d.markdown = value.slice(0, s) + before + sel + after + value.slice(en);
-      queueMicrotask(() => textarea!.setSelectionRange(s + before.length, en + before.length));
-      changed();
-    };
-    if (e.key === "b") wrap("**");
-    else if (e.key === "i") wrap("*");
-    else if (e.key === "k") wrap("[", "](https://)");
   }
 
   function pickFrom(o: FromOption) {
@@ -100,15 +61,6 @@
       <span class="saved">{savedLabel}</span>
       <div class="actions">
         <button class="icon-btn" aria-label="Attach" title="Attach files" onclick={() => fileInput?.click()}><Paperclip size={19} strokeWidth={1.7} /></button>
-        <button
-          class="icon-btn"
-          class:active={composer.preview}
-          aria-label={composer.preview ? "Edit" : "Preview"}
-          title={composer.preview ? "Edit (⌘⇧P)" : "Preview (⌘⇧P)"}
-          onclick={() => (composer.preview = !composer.preview)}
-        >
-          {#if composer.preview}<PenLine size={19} strokeWidth={1.7} />{:else}<Eye size={19} strokeWidth={1.7} />{/if}
-        </button>
         <button class="send" aria-label="Send" title="Send (⌘↩)" onclick={() => composer.send()}>
           <ArrowUp size={18} strokeWidth={2.2} />
         </button>
@@ -136,20 +88,16 @@
         <input class="subject" placeholder="Subject" bind:value={d.subject} oninput={changed} enterkeyhint="next" />
       </div>
 
-      {#if composer.preview}
-        <div class="preview">
-          <MailBody html={composer.previewHtml()} loadImages={true} />
-        </div>
-      {:else}
-        <textarea
-          bind:this={textarea}
-          bind:value={d.markdown}
-          class="editor"
-          placeholder="Write in Markdown…"
-          oninput={() => (changed(), autosize())}
-          onkeydown={onTextKey}
-          spellcheck="true"
-        ></textarea>
+      <MarkdownEditor
+        value={d.markdown}
+        placeholder="Write something…"
+        autofocus={d.mode === "reply" || d.mode === "replyAll" || d.mode === "draft"}
+        onchange={(v) => {
+          d.markdown = v;
+          changed();
+        }}
+        onsend={() => composer.send()}
+      />
 
         {#if d.signature && d.includeSignature}
           <div class="sig">
@@ -170,7 +118,6 @@
             {/if}
           </div>
         {/if}
-      {/if}
 
       {#if d.attachments.length || composer.loadingAttachments}
         <div class="atts">
@@ -187,7 +134,7 @@
     </div>
 
     <footer>
-      <span class="hint">Markdown · <code>**bold**</code> <code>*italic*</code> <code>[link](url)</code> <code>- list</code></span>
+      <span class="hint">Markdown · ⌘B bold · ⌘I italic · ⌘K link</span>
       <button class="icon-btn" aria-label="Discard" title="Discard draft" onclick={() => composer.discard()}><Trash2 size={17} strokeWidth={1.7} /></button>
     </footer>
   </div>
@@ -237,10 +184,6 @@
     display: flex;
     align-items: center;
     gap: 2px;
-  }
-  .icon-btn.active {
-    color: var(--text);
-    background: var(--bg-selected);
   }
   .send {
     width: 34px;
@@ -301,22 +244,6 @@
     font-size: 15px;
     height: 32px;
     padding: 0;
-  }
-  .editor {
-    display: block;
-    width: 100%;
-    border: none;
-    outline: none;
-    resize: none;
-    background: transparent;
-    padding: 16px 20px 8px;
-    font-size: 15.5px;
-    line-height: 1.55;
-    min-height: 180px;
-    overflow: hidden;
-  }
-  .preview {
-    padding: 16px 20px;
   }
   .sig {
     position: relative;
@@ -405,11 +332,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .hint code {
-    font-family: var(--mono);
-    font-size: 11px;
-    margin-right: 4px;
   }
   .via {
     color: var(--text-3);

@@ -10,6 +10,8 @@
     checked: boolean;
     selecting: boolean;
     showAccount: boolean;
+    /** Account colour, shown as a pill at the row's left edge. */
+    color: string;
     sentView: boolean;
     swipeLeft: SwipeAction;
     swipeRight: SwipeAction;
@@ -21,7 +23,7 @@
     onstar: () => void;
   }
 
-  let { thread, active, checked, selecting, showAccount, sentView, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onstar }: Props = $props();
+  let { thread, active, checked, selecting, showAccount, color, sentView, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onstar }: Props = $props();
 
   let row: HTMLDivElement;
   let dx = $state(0);
@@ -164,6 +166,7 @@
       oncheck();
     }}
   >
+    <span class="pill" style:background={color} aria-hidden="true"></span>
     <div class="mark">
       {#if selecting}
         <span class="check" class:on={checked}></span>
@@ -246,7 +249,7 @@
     position: relative;
     display: flex;
     gap: 10px;
-    padding: 13px 18px 13px 8px;
+    padding: 13px 18px 13px 16px;
     background: var(--bg);
     cursor: default;
     touch-action: pan-y;
@@ -270,10 +273,19 @@
   .row::after {
     content: "";
     position: absolute;
-    left: 26px;
+    left: 34px;
     right: 0;
     bottom: 0;
     border-bottom: 1px solid var(--line);
+  }
+  .pill {
+    position: absolute;
+    left: 5px;
+    top: 14px;
+    bottom: 14px;
+    width: 4px;
+    border-radius: 4px;
+    opacity: 0.9;
   }
   .mark {
     width: 10px;

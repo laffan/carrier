@@ -233,6 +233,7 @@
           checked={app.selection.has(threadKey(t))}
           {selecting}
           showAccount={app.current === ALL}
+          color={app.accountColor(t.account)}
           sentView={label === "SENT"}
           swipeLeft={settings.value.swipeLeft}
           swipeRight={settings.value.swipeRight}

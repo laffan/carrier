@@ -221,7 +221,6 @@
   .two .listpane {
     flex: none;
     width: clamp(340px, 34vw, 440px);
-    border-right: 1px solid var(--line);
   }
   .listpane.hidden {
     display: none;

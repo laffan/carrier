@@ -273,14 +273,6 @@
   .row.checked {
     background: var(--accent-soft);
   }
-  .row::after {
-    content: "";
-    position: absolute;
-    left: 30px;
-    right: 0;
-    bottom: 0;
-    border-bottom: 1px solid var(--line);
-  }
   /* Account colour: a bar flush with the window edge with a soft glow. */
   .pill {
     position: absolute;

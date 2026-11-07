@@ -1,0 +1,202 @@
+:root {
+  --bg: #ffffff;
+  --bg-2: #f7f7f5;
+  --bg-3: #efefec;
+  --bg-hover: rgba(0, 0, 0, 0.035);
+  --bg-selected: rgba(0, 0, 0, 0.06);
+  --text: #141414;
+  --text-2: #6a6a6a;
+  --text-3: #a3a3a3;
+  --line: rgba(0, 0, 0, 0.08);
+  --line-2: rgba(0, 0, 0, 0.14);
+  --accent: #2557d6;
+  --accent-soft: rgba(37, 87, 214, 0.1);
+  --danger: #c43d2f;
+  --star: #c99317;
+  --swipe-archive: #3f7f52;
+  --swipe-trash: #c4483a;
+  --swipe-read: #2557d6;
+  --swipe-star: #c99317;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --radius: 12px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --header-h: 56px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121213;
+    --bg-2: #18181a;
+    --bg-3: #222225;
+    --bg-hover: rgba(255, 255, 255, 0.04);
+    --bg-selected: rgba(255, 255, 255, 0.08);
+    --text: #ececec;
+    --text-2: #9a9a9a;
+    --text-3: #626262;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-2: rgba(255, 255, 255, 0.15);
+    --accent: #7ea2ff;
+    --accent-soft: rgba(126, 162, 255, 0.14);
+    --danger: #ff7a6b;
+    --shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #121213;
+  --bg-2: #18181a;
+  --bg-3: #222225;
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-selected: rgba(255, 255, 255, 0.08);
+  --text: #ececec;
+  --text-2: #9a9a9a;
+  --text-3: #626262;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.15);
+  --accent: #7ea2ff;
+  --accent-soft: rgba(126, 162, 255, 0.14);
+  --danger: #ff7a6b;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* Icon button used across toolbars */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--text-2);
+  flex: none;
+  transition: background 0.12s, color 0.12s;
+}
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.icon-btn:active {
+  background: var(--bg-selected);
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.icon-btn.on {
+  color: var(--star);
+}
+
+.text-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.text-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.text-btn.primary {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 500;
+}
+.text-btn.primary:hover {
+  opacity: 0.88;
+}
+.text-btn.danger {
+  color: var(--danger);
+}
+
+.scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.muted {
+  color: var(--text-2);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--text-2);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* iOS zooms into inputs smaller than 16px; avoid it on touch devices. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

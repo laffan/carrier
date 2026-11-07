@@ -1,0 +1,41 @@
+{
+  "name": "carrier",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "tauri": "tauri",
+    "ios:dev": "tauri ios dev",
+    "ios:build": "tauri ios build"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@lucide/svelte": "^1.70.0",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-http": "^2.5.0",
+    "@tauri-apps/plugin-opener": "^2.7.2",
+    "@tauri-apps/plugin-store": "^2.5.0",
+    "dompurify": "^3.4.17",
+    "marked": "^18.1.3",
+    "tauri-plugin-auth-session-api": "^0.2.2",
+    "turndown": "^7.2.5"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tauri-apps/cli": "^2.12.4",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "^24.0.0",
+    "@types/turndown": "^5.0.6",
+    "jsdom": "^31.0.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Saved attachments appear in Files › On My iPad › Carrier -->
+  <key>UIFileSharingEnabled</key>
+  <true/>
+  <key>LSSupportsOpeningDocumentsInPlace</key>
+  <true/>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>Carrier attaches photos you choose to outgoing mail.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Carrier attaches photos you take to outgoing mail.</string>
+</dict>
+</plist>

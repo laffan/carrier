@@ -16,7 +16,6 @@ export interface Settings {
   signatures: Record<string, string>;
   /** Whether a signature was imported/edited at least once (otherwise Gmail's is used). */
   signaturesCustomized: Record<string, boolean>;
-  googleClientId: string;
 }
 
 export const DEFAULTS: Settings = {
@@ -29,7 +28,6 @@ export const DEFAULTS: Settings = {
   defaultReply: "reply",
   signatures: {},
   signaturesCustomized: {},
-  googleClientId: "",
 };
 
 class SettingsStore {
@@ -47,7 +45,6 @@ class SettingsStore {
     this.value = { ...this.value, ...patch };
     this.applyTheme();
     await kvSet("settings", $state.snapshot(this.value));
-    if ("googleClientId" in patch) await kvSet("googleClientId", patch.googleClientId);
   }
 
   applyTheme() {

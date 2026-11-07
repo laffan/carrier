@@ -9,7 +9,7 @@ Version 0.1 aims to match the everyday Gmail app with less on screen. The one de
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Runs the UI in a browser at http://127.0.0.1:1420 in **demo mode**, with two in-memory accounts and no Google sign-in. Use this to work on the interface. |
-| `npm run tauri dev` | Runs the macOS desktop app with real Gmail. |
+| `npm run tauri dev` | Runs the macOS desktop app with real Gmail (needs the one-time registration below). |
 | `npm run tauri ios dev` | Runs on an iPad simulator or a connected iPad (setup below). |
 | `npm test` | Unit tests for MIME, Markdown, address parsing and PKCE. |
 | `npm run check` | Type-checks the Svelte and TypeScript code. |
@@ -31,27 +31,30 @@ rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 npm install
 ```
 
-### 2. Google Cloud OAuth client
+### 2. One-time: register Carrier with Google
 
-Carrier talks to Gmail directly from the device. There is no server, so you need your own OAuth client.
+**Adding an account** works the way it does in the Gmail app or Apple Mail. You tap **Sign in with Google**, Google's own sign-in page opens in the system sheet, and you sign in with any personal Gmail or Google Workspace account (including 2-step verification and passkeys). You never enter a client ID, password or server setting, and you can add as many accounts as you want.
 
-1. In the [Google Cloud console](https://console.cloud.google.com/), create a project.
+To show that sign-in page, Google requires every third-party mail app to identify itself with an **app ID**, which is compiled into the app. Apple Mail, Spark and Outlook each have one built in. Carrier needs its own, created **once by whoever builds the app**. It is not a secret and is not something users handle. Borrowing another app's ID is against Google's terms, so Carrier doesn't.
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create a project, for example "Carrier".
 2. Enable the **Gmail API** and the **People API**. People is used for recipient autocomplete; if it's disabled, Carrier falls back to addresses it has seen.
-3. Configure the **OAuth consent screen**:
-   - Choose user type **External**, or **Internal** if every account is in your own Workspace.
-   - Add these scopes: `https://mail.google.com/`, `contacts.readonly`, `contacts.other.readonly`, `openid`, `email` and `profile`.
-   - Add each Gmail address you'll use as a **test user**.
-4. Create credentials: **OAuth client ID**, application type **iOS**, bundle ID `app.carrier.mail`. Use the same value as `identifier` in `src-tauri/tauri.conf.json` (change both if you prefer another ID). An iOS client has no client secret. Carrier uses PKCE, and that client also works for the macOS build.
-5. Copy the client ID into `.env`:
+3. Under **Google Auth Platform › Branding / Audience**, set the app name to "Carrier", choose user type **External**, then set the publishing status to **In production**. Don't submit for verification.
+4. Under **Data access**, add these scopes: `https://mail.google.com/`, `.../auth/contacts.readonly`, `.../auth/contacts.other.readonly`, `openid`, `email` and `profile`.
+5. Under **Clients**, create a client: type **iOS**, bundle ID `app.carrier.mail` (the `identifier` in `src-tauri/tauri.conf.json`). The same ID also works for the macOS build.
+6. Put the ID in `.env`. `tauri dev`, `tauri build` and the `ios` commands refuse to build without it:
 
 ```bash
 cp .env.example .env
-# then set VITE_GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+# VITE_GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
 ```
 
-You can also paste the client ID on the welcome screen or in Settings › Developer.
+**What this means for sign-in**
 
-**Token lifetime.** While the consent screen's publishing status is **Testing**, Google expires refresh tokens after 7 days, so you'd have to sign in again every week. For personal use, set the status to **In production** but don't submit for verification. Sign-in then shows an "unverified app" warning (click *Advanced › Go to …*), and tokens no longer expire weekly. An unverified app is limited to 100 users. `https://mail.google.com/` is a restricted scope, so distributing Carrier to other people would require Google's security assessment.
+- **Personal Gmail accounts.** Google's sign-in shows a one-time "Google hasn't verified this app" notice; tap *Advanced › Go to Carrier*. After that, accounts stay signed in.
+- **Workspace accounts.** Sign-in works the same way unless the organisation's admin restricts third-party apps. In that case Google shows "Access blocked" and Carrier asks you to have the admin mark Carrier as trusted (Admin console › Security › API controls). Apple Mail and Spark face the same restriction.
+- **Why "In production".** If the status is left on "Testing" instead, every account must be listed as a test user and is signed out every 7 days.
+- **Removing the notice.** An unverified app can be used by up to 100 Google accounts. Getting rid of the notice, or distributing Carrier publicly, requires Google's verification. Because `https://mail.google.com/` is a "restricted" scope, that verification includes a paid third-party security assessment.
 
 ### 3. iPad
 
@@ -68,7 +71,7 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
 
 ### Implemented (Gmail parity)
 
-- **Accounts.** Multiple Gmail accounts, an *All inboxes* view, an account switcher, and a re-sign-in prompt when a token is revoked.
+- **Accounts.** Sign in with Google, for multiple personal and Workspace accounts, with an *All inboxes* view, an account switcher, and a re-sign-in prompt when a token is revoked.
 - **Mailboxes.** Primary, Social, Promotions, Updates, Forums, Starred, Important, Sent, Drafts, All mail, Spam, Trash and your Gmail labels, with unread counts. Settings › Inbox type switches between Primary and Everything.
 - **List.**
   - Conversations, with participants, message counts, a draft marker, attachment indicator and star.
@@ -153,7 +156,7 @@ src/
     settings.svelte.ts       persisted preferences
     platform.ts              Tauri vs browser: HTTP, Keychain, store, files, opener
     mail/
-      auth.ts                Google OAuth (PKCE) via ASWebAuthenticationSession
+      auth.ts                Sign in with Google (system web sheet, OAuth + PKCE)
       gmail.ts               Gmail + People API client
       mime.ts                RFC 5322/2047/2231 builder and Gmail payload parser
       markdown.ts            Markdown → inline-styled email HTML

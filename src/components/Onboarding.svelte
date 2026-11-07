@@ -1,22 +1,11 @@
 <script lang="ts">
   import { app } from "../lib/app.svelte";
-  import { getClientId } from "../lib/mail/auth";
-  import { settings } from "../lib/settings.svelte";
 
-  let clientId = $state("");
-  let hasClientId = $state(true);
   let busy = $state(false);
-
-  $effect(() => {
-    getClientId().then((id) => {
-      hasClientId = !!id;
-    });
-  });
 
   async function add() {
     busy = true;
     try {
-      if (!hasClientId && clientId.trim()) await settings.update({ googleClientId: clientId.trim() });
       await app.addAccount();
     } finally {
       busy = false;
@@ -28,16 +17,16 @@
   <div class="card">
     <h1>Carrier</h1>
     <p class="muted">A quiet place for your mail.</p>
-    {#if !hasClientId}
-      <label>
-        <span>Google OAuth client ID</span>
-        <input bind:value={clientId} placeholder="1234-abc.apps.googleusercontent.com" autocapitalize="off" autocorrect="off" spellcheck="false" />
-        <span class="hint">Create an “iOS” OAuth client in Google Cloud and paste its ID. See README.</span>
-      </label>
-    {/if}
-    <button class="text-btn primary big" disabled={busy || (!hasClientId && !clientId.trim())} onclick={add}>
-      {busy ? "Waiting for Google…" : "Add Gmail account"}
+    <button class="text-btn primary big" disabled={busy} onclick={add}>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8Z" />
+        <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24Z" />
+        <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1Z" />
+        <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9Z" />
+      </svg>
+      {busy ? "Waiting for Google…" : "Sign in with Google"}
     </button>
+    <p class="hint">Works with Gmail and Google Workspace accounts. You can add more accounts later.</p>
   </div>
 </main>
 
@@ -50,7 +39,7 @@
     padding: 24px;
   }
   .card {
-    width: min(380px, 100%);
+    width: min(360px, 100%);
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -64,29 +53,22 @@
   p {
     margin: 0 0 18px;
   }
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 14px;
-  }
-  input {
-    border: 1px solid var(--line-2);
-    background: var(--bg);
-    border-radius: 10px;
-    padding: 10px 12px;
-    outline: none;
-  }
-  .hint {
-    font-size: 12px;
-    color: var(--text-2);
-  }
   .big {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     padding: 13px 16px;
     font-size: 15px;
     border-radius: 12px;
   }
   .big:disabled {
-    opacity: 0.4;
+    opacity: 0.5;
+  }
+  .hint {
+    font-size: 12.5px;
+    color: var(--text-2);
+    text-align: center;
+    margin: 0;
   }
 </style>

@@ -63,7 +63,7 @@
           {/if}
         </div>
       {/each}
-      {#if !app.demo}<button class="text-btn add" onclick={() => app.addAccount()}>Add account</button>{/if}
+      {#if !app.demo}<button class="text-btn add" onclick={() => app.addAccount()}>Add Google account</button>{/if}
     </section>
 
     <section>
@@ -151,22 +151,6 @@
       </label>
     </section>
 
-    {#if !app.demo}
-      <section>
-        <h2>Developer</h2>
-        <label class="col">
-          <span>Google OAuth client ID (iOS type)</span>
-          <input
-            class="text"
-            placeholder={import.meta.env.VITE_GOOGLE_CLIENT_ID || "1234-abc.apps.googleusercontent.com"}
-            value={s.googleClientId}
-            onchange={(e) => settings.update({ googleClientId: e.currentTarget.value.trim() })}
-          />
-          <span class="sub">Overrides the build-time VITE_GOOGLE_CLIENT_ID. Adding an account uses this client.</span>
-        </label>
-      </section>
-    {/if}
-
     <section class="about">
       <span class="sub">Carrier 0.1.0</span>
     </section>
@@ -216,13 +200,6 @@
     padding: 9px 0;
     font-size: 15px;
   }
-  .col {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 15px;
-    padding: 6px 0;
-  }
   .grow {
     flex: 1;
     min-width: 0;
@@ -251,7 +228,6 @@
     height: 20px;
     accent-color: var(--text);
   }
-  .text,
   textarea {
     width: 100%;
     border: 1px solid var(--line-2);
@@ -267,7 +243,6 @@
     font-size: 13px;
     line-height: 1.5;
   }
-  .text:focus,
   textarea:focus {
     border-color: var(--text-3);
   }

@@ -89,7 +89,7 @@
           </button>
         {/each}
         <button class="item subtle" onclick={() => { accountsOpen = false; app.addAccount(); }}>
-          <span class="with-icon"><Plus size={15} strokeWidth={1.8} /> Add account</span>
+          <span class="with-icon"><Plus size={15} strokeWidth={1.8} /> Add Google account</span>
         </button>
       </div>
     {/if}

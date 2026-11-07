@@ -132,6 +132,20 @@
     pullStart = null;
   }
 
+  /** Opens a row from the Drafts section straight into compose. */
+  async function openDraftRow(t: (typeof app.threads)[number]) {
+    try {
+      const thread = await app.backend(t.account).getThread(t.id);
+      const draft =
+        thread.messages.find((m) => m.id === t.draft?.messageId) ?? [...thread.messages].reverse().find((m) => m.labelIds.includes("DRAFT"));
+      if (draft) composer.openDraft(t.account, draft, thread.id);
+    } catch (e) {
+      app.handleError(e, t.account);
+    }
+  }
+
+  const draftsMore = $derived(Math.max(0, app.draftsTotal - app.drafts.length));
+
   async function openRow(t: (typeof app.threads)[number]) {
     // Draft-only conversations open straight into compose.
     if (t.hasDraft && (t.messageCount <= 1 || label === "DRAFT") && t.labelIds.includes("DRAFT")) {
@@ -223,9 +237,39 @@
         <p>{app.listError}</p>
         <button class="text-btn" onclick={() => app.loadList()}>Try again</button>
       </div>
-    {:else if !app.threads.length}
+    {:else if !app.threads.length && !app.drafts.length}
       <div class="empty"><p class="muted">{app.view.kind === "search" ? "No results" : `Nothing in ${app.viewTitle}`}</p></div>
     {:else}
+      {#if app.showsDrafts && app.drafts.length && !selecting}
+        <div class="section">
+          <span>Drafts</span>
+          {#if draftsMore > 0}
+            <button class="more" onclick={() => app.setView({ kind: "label", label: "DRAFT" })}>{draftsMore} more</button>
+          {/if}
+        </div>
+        {#each app.drafts as t (threadKey(t) + ":draft")}
+          <ThreadRow
+            thread={t}
+            active={false}
+            checked={false}
+            selecting={false}
+            showAccount={false}
+            color={app.accountColor(t.account)}
+            sentView={false}
+            draftView={true}
+            swipeLeft="none"
+            swipeRight="none"
+            removes={() => false}
+            onopen={() => openDraftRow(t)}
+            oncheck={() => {}}
+            onswipe={() => {}}
+            onstar={() => {}}
+          />
+        {/each}
+        <div class="section">
+          <span>{app.current === ALL ? "Inbox" : app.viewTitle}</span>
+        </div>
+      {/if}
       {#each app.threads as t (threadKey(t))}
         <ThreadRow
           thread={t}
@@ -351,6 +395,24 @@
   }
   .empty p {
     margin: 0;
+  }
+  .section {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 14px 18px 4px 30px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .section .more {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-2);
   }
   .sentinel {
     display: flex;

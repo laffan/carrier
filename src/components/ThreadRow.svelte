@@ -13,6 +13,8 @@
     /** Account colour, shown as a pill at the row's left edge. */
     color: string;
     sentView: boolean;
+    /** Show the conversation's latest draft (Inbox drafts section). */
+    draftView?: boolean;
     swipeLeft: SwipeAction;
     swipeRight: SwipeAction;
     /** Whether an action removes the row from this list (animate it away). */
@@ -23,7 +25,7 @@
     onstar: () => void;
   }
 
-  let { thread, active, checked, selecting, showAccount, color, sentView, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onstar }: Props = $props();
+  let { thread, active, checked, selecting, showAccount, color, sentView, draftView = false, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onstar }: Props = $props();
 
   let row: HTMLDivElement;
   let dx = $state(0);
@@ -123,6 +125,7 @@
 
   const names = $derived.by(() => {
     const ps = thread.participants;
+    if (draftView) return "To: " + (thread.draft?.to.join(", ") || "(no recipients)");
     if (sentView) return "To: " + (thread.recipients.join(", ") || "(no recipients)");
     if (!ps.length) return thread.hasDraft ? "" : "(no sender)";
     if (ps.length === 1) return ps[0].isMe ? "me" : ps[0].name || ps[0].email;
@@ -139,6 +142,7 @@
   class:collapsing
   style:--bgc={action === "archive" ? "var(--swipe-archive)" : action === "trash" ? "var(--swipe-trash)" : action === "read" ? "var(--swipe-read)" : action === "star" ? "var(--swipe-star)" : "var(--bg-3)"}
 >
+  <span class="pill" style:--c={color} aria-hidden="true"></span>
   {#if dx !== 0}
     <div class="under" class:armed>
       {#if dx > 0 && LeftIcon}<span class="ic left"><LeftIcon size={20} strokeWidth={1.8} /></span>{/if}
@@ -166,7 +170,6 @@
       oncheck();
     }}
   >
-    <span class="pill" style:background={color} aria-hidden="true"></span>
     <div class="mark">
       {#if selecting}
         <span class="check" class:on={checked}></span>
@@ -177,18 +180,18 @@
     <div class="body">
       <div class="line1">
         <span class="from">
-{names}{#if thread.hasDraft}<span class="draft">{thread.participants.length ? ", " : ""}Draft</span>{/if}
-          {#if thread.messageCount > 1}<span class="count">{thread.messageCount}</span>{/if}
+{#if draftView}<span class="draft">Draft</span> {names}{:else}{names}{#if thread.hasDraft}<span class="draft">{thread.participants.length ? ", " : ""}Draft</span>{/if}
+          {#if thread.messageCount > 1}<span class="count">{thread.messageCount}</span>{/if}{/if}
         </span>
-        <span class="date">{listDate(thread.date)}</span>
+        <span class="date">{listDate(draftView ? (thread.draft?.date ?? thread.date) : thread.date)}</span>
       </div>
       <div class="line2">
-        <span class="subject">{thread.subject || "(no subject)"}</span>
+        <span class="subject">{(draftView ? thread.draft?.subject : thread.subject) || "(no subject)"}</span>
         {#if thread.hasAttachments}<span class="clip"><Paperclip size={13} strokeWidth={1.8} /></span>{/if}
       </div>
       <div class="line3">
-        <span class="snippet">{thread.snippet}</span>
-        <button
+        <span class="snippet">{draftView ? thread.draft?.snippet || "" : thread.snippet}</span>
+        {#if !draftView}<button
           class="star"
           class:on={thread.starred}
           aria-label={thread.starred ? "Unstar" : "Star"}
@@ -199,7 +202,7 @@
           }}
         >
           <Star size={15} strokeWidth={1.7} fill={thread.starred ? "currentColor" : "none"} />
-        </button>
+        </button>{/if}
       </div>
       {#if showAccount}<div class="acct">{thread.account}</div>{/if}
     </div>
@@ -249,7 +252,7 @@
     position: relative;
     display: flex;
     gap: 10px;
-    padding: 13px 18px 13px 16px;
+    padding: 13px 18px 13px 12px;
     background: var(--bg);
     cursor: default;
     touch-action: pan-y;
@@ -273,19 +276,32 @@
   .row::after {
     content: "";
     position: absolute;
-    left: 34px;
+    left: 30px;
     right: 0;
     bottom: 0;
     border-bottom: 1px solid var(--line);
   }
+  /* Account colour: a bar flush with the window edge with a soft glow. */
   .pill {
     position: absolute;
-    left: 5px;
-    top: 14px;
-    bottom: 14px;
-    width: 4px;
-    border-radius: 4px;
-    opacity: 0.9;
+    z-index: 2;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--c);
+    box-shadow: 0 0 10px 1px color-mix(in srgb, var(--c) 55%, transparent);
+    pointer-events: none;
+  }
+  .pill::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: -6px;
+    bottom: -6px;
+    width: 22px;
+    background: radial-gradient(ellipse at left center, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%);
   }
   .mark {
     width: 10px;

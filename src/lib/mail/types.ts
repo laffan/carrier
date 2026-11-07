@@ -29,6 +29,8 @@ export interface ThreadSummary {
   starred: boolean;
   hasAttachments: boolean;
   hasDraft: boolean;
+  /** The latest unsent draft in the conversation, if any. */
+  draft?: { messageId: string; to: string[]; subject: string; snippet: string; date: number };
   lastMessageId: string;
 }
 

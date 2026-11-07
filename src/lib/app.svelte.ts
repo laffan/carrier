@@ -51,6 +51,8 @@ function splitKey(key: string): { account: string; id: string } {
 }
 
 const PAGE = 30;
+/** How many drafts the Inbox's Drafts section shows. */
+const DRAFTS_SHOWN = 5;
 
 class App {
   ready = $state(false);
@@ -67,6 +69,10 @@ class App {
   refreshing = $state(false);
   listError = $state<string | null>(null);
   hasMore = $state(false);
+
+  /** Latest drafts, shown in a section above the Inbox. */
+  drafts = $state<ThreadSummary[]>([]);
+  private draftsGeneration = 0;
 
   open = $state<{ account: string; id: string } | null>(null);
   thread = $state<Thread | null>(null);
@@ -326,9 +332,39 @@ class App {
     return m;
   }
 
+  /** Whether the current view shows the Drafts section (Inbox / All inboxes). */
+  get showsDrafts(): boolean {
+    return this.view.kind === "label" && this.view.label === "INBOX";
+  }
+
+  /** Total drafts across the accounts in view (from label counts). */
+  get draftsTotal(): number {
+    return this.accountsInView.reduce((n, a) => n + this.unreadCount(a, "DRAFT"), 0);
+  }
+
+  async loadDrafts() {
+    const gen = ++this.draftsGeneration;
+    if (!this.showsDrafts) {
+      this.drafts = [];
+      return;
+    }
+    const accounts = this.accountsInView.filter((a) => !this.account(a)?.needsReauth);
+    const results = await Promise.allSettled(
+      accounts.map((email) => this.backend(email).listThreads({ labelIds: ["DRAFT"], maxResults: DRAFTS_SHOWN }, this.summaries(email))),
+    );
+    if (gen !== this.draftsGeneration) return;
+    const all = results.flatMap((r) => (r.status === "fulfilled" ? r.value.threads : []));
+    this.drafts = all
+      .filter((t) => t.draft)
+      .sort((a, b) => (b.draft?.date ?? b.date) - (a.draft?.date ?? a.date))
+      .slice(0, DRAFTS_SHOWN);
+  }
+
   async loadList() {
     const gen = ++this.generation;
     this.listError = null;
+    if (!this.showsDrafts) this.drafts = [];
+    this.loadDrafts();
     const cached = cacheGet<ThreadSummary[]>(this.cacheKey());
     if (cached?.length) {
       this.threads = cached;
@@ -394,6 +430,7 @@ class App {
       this.threads = [...fresh, ...tail];
       cacheSet(this.cacheKey(), fresh.slice(0, PAGE));
       this.refreshCounts();
+      this.loadDrafts();
       if (this.open && this.thread) this.reloadThread();
     } catch (e) {
       this.handleError(e, undefined, true);
@@ -767,6 +804,7 @@ class App {
   /** Called after sending or saving a draft to keep lists in sync. */
   afterSend() {
     if (this.viewLabel === "SENT" || this.viewLabel === "DRAFT" || this.view.kind === "search") this.refresh();
+    this.loadDrafts();
     if (this.open) this.reloadThread();
     this.refreshCounts();
   }

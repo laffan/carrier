@@ -189,6 +189,16 @@ export class GmailBackend implements MailBackend {
       } else participants.push({ name: from.name, email: from.email, unread, isMe });
     }
     const first = msgs[0];
+    const d = [...msgs].reverse().find((m) => m.labelIds?.includes("DRAFT"));
+    const draft = d
+      ? {
+          messageId: d.id,
+          to: parseAddressList(decodeHeaderText(header(d.payload?.headers, "To"))).map((a) => a.name || a.email),
+          subject: decodeHeaderText(header(d.payload?.headers, "Subject")),
+          snippet: decodeEntities(d.snippet ?? ""),
+          date: Number(d.internalDate ?? 0),
+        }
+      : undefined;
     return {
       account: this.email,
       id: t.id,
@@ -203,7 +213,8 @@ export class GmailBackend implements MailBackend {
       unread: msgs.some((m) => m.labelIds?.includes("UNREAD")),
       starred: msgs.some((m) => m.labelIds?.includes("STARRED")),
       hasAttachments: msgs.some((m) => /multipart\/mixed/i.test(header(m.payload?.headers, "Content-Type"))),
-      hasDraft: msgs.some((m) => m.labelIds?.includes("DRAFT")),
+      hasDraft: !!draft,
+      draft,
       lastMessageId: last?.id ?? "",
     };
   }

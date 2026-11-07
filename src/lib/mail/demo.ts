@@ -342,6 +342,10 @@ export class DemoBackend implements MailBackend {
       starred: msgs.some((m) => m.labelIds.includes("STARRED")),
       hasAttachments: msgs.some((m) => m.attachments.length > 0),
       hasDraft: msgs.some((m) => m.labelIds.includes("DRAFT")),
+      draft: (() => {
+        const d = [...msgs].reverse().find((m) => m.labelIds.includes("DRAFT"));
+        return d ? { messageId: d.id, to: d.to.map((a) => a.name || a.email), subject: d.subject, snippet: d.snippet, date: d.date } : undefined;
+      })(),
       lastMessageId: last.id,
     };
   }

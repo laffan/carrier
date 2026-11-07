@@ -74,6 +74,7 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
 - **Accounts.** Sign in with Google, for multiple personal and Workspace accounts, with an *All inboxes* view, an account switcher, and a re-sign-in prompt when a token is revoked.
 - **Mailboxes.** Primary, Social, Promotions, Updates, Forums, Starred, Important, Sent, Drafts, All mail, Spam, Trash and your Gmail labels, with unread counts. Settings › Inbox type switches between Primary and Everything.
 - **List.**
+  - Inbox opens with a Drafts section (latest 5 drafts across the accounts in view, with a link to the rest); tapping one reopens it in compose.
   - Conversations, with participants, message counts, a draft marker, attachment indicator and star.
   - Pull to refresh, infinite scroll, and a refresh every 60 seconds while the app is visible.
   - The last list is cached for an instant start.
@@ -117,7 +118,7 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
   | `⌘↩` | Send |
   | `⌘B` / `⌘I` / `⌘K` / `⌘E` / `⌘⇧X` | Bold / italic / link / code / strikethrough (in the editor) |
 
-- **Appearance.** Light, dark and system themes. Messages always sit on the app background; in dark mode, designed HTML mail is colour-inverted (images kept) so it stays readable. Each account has a colour, shown as a pill beside its messages (change it in Settings). Two panes on a landscape iPad or a Mac, and a persistent sidebar on wide screens.
+- **Appearance.** Light, dark and system themes. Messages always sit on the app background; in dark mode, designed HTML mail is colour-inverted (images kept) so it stays readable. Each account has a colour, shown as a glowing bar at the window's left edge beside its messages (change it in Settings). Two panes on a landscape iPad or a Mac, and a persistent sidebar on wide screens.
 
 ### Markdown
 

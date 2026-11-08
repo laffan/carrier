@@ -81,7 +81,7 @@ const seeds: Seed[] = [
     subject: "Reading group — this Friday",
     body: "Hello all,\n\nThis Friday we're discussing chapters 4–6. Snacks provided.\n\nBest,\nPriya",
     ago: 9 * H,
-    labels: ["INBOX", "CATEGORY_PERSONAL", "STARRED"],
+    labels: ["INBOX", "CATEGORY_PERSONAL", "PINNED"],
   },
   {
     from: 6,
@@ -186,7 +186,7 @@ const userLabels: Label[] = [
 ];
 
 const systemLabels = [
-  "INBOX", "STARRED", "IMPORTANT", "SENT", "DRAFT", "SPAM", "TRASH", "UNREAD",
+  "INBOX", "STARRED", "PINNED", "IMPORTANT", "SENT", "DRAFT", "SPAM", "TRASH", "UNREAD",
   "CATEGORY_PERSONAL", "CATEGORY_SOCIAL", "CATEGORY_PROMOTIONS", "CATEGORY_UPDATES", "CATEGORY_FORUMS",
 ];
 
@@ -282,7 +282,7 @@ export class DemoBackend implements MailBackend {
       const [k, ...rest] = t.split(":");
       const v = rest.join(":").replace(/"/g, "");
       if (rest.length) {
-        if (k === "is") return v === "unread" ? msgs.some((m) => m.labelIds.includes("UNREAD")) : v === "starred" ? msgs.some((m) => m.labelIds.includes("STARRED")) : true;
+        if (k === "is") return v === "unread" ? msgs.some((m) => m.labelIds.includes("UNREAD")) : v === "starred" ? msgs.some((m) => m.labelIds.includes("STARRED")) : v === "pinned" ? msgs.some((m) => m.labelIds.includes("PINNED")) : true;
         if (k === "from") return msgs.some((m) => `${m.from.name} ${m.from.email}`.toLowerCase().includes(v));
         if (k === "to") return msgs.some((m) => m.to.some((a) => `${a.name} ${a.email}`.toLowerCase().includes(v)));
         if (k === "has") return v === "attachment" ? msgs.some((m) => m.attachments.length > 0) : true;
@@ -339,7 +339,7 @@ export class DemoBackend implements MailBackend {
       date: last.date,
       labelIds,
       unread: msgs.some((m) => m.labelIds.includes("UNREAD")),
-      starred: msgs.some((m) => m.labelIds.includes("STARRED")),
+      pinned: labelIds.includes("PINNED"),
       hasAttachments: msgs.some((m) => m.attachments.length > 0),
       hasDraft: msgs.some((m) => m.labelIds.includes("DRAFT")),
       draft: (() => {

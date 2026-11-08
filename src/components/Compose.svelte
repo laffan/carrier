@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { X, Paperclip, Trash2, ChevronDown, ArrowUp } from "@lucide/svelte";
+  import { onMount } from "svelte";
+  import { X, Paperclip, Trash2, ChevronDown, ArrowUp, Maximize2 } from "@lucide/svelte";
   import { app } from "../lib/app.svelte";
   import { composer, type FromOption } from "../lib/compose.svelte";
   import { markdownToHtml } from "../lib/mail/markdown";
@@ -10,14 +11,22 @@
   import RecipientField from "./RecipientField.svelte";
   import Sheet from "./Sheet.svelte";
 
+  interface Props {
+    /** Rendered beneath the conversation (replies and forwards) instead of in a sheet. */
+    inline?: boolean;
+  }
+  let { inline = false }: Props = $props();
+
   const d = $derived(composer.draft!);
+  let card = $state<HTMLElement>();
   let showCc = $state(false);
   let fileInput = $state<HTMLInputElement>();
   let fromOpen = $state(false);
   let fromAnchor = $state<HTMLElement>();
   let showQuote = $state(false);
 
-  const fromOptions = $derived(composer.fromOptions());
+  // An inline reply stays in its conversation, so it can only switch between that account's addresses.
+  const fromOptions = $derived(composer.fromOptions().filter((o) => !inline || o.account === d.account));
   const title = $derived(
     d.mode === "reply" || d.mode === "replyAll" ? "Reply" : d.mode === "forward" ? "Forward" : d.mode === "draft" ? "Draft" : "New message",
   );
@@ -49,17 +58,31 @@
     composer.addFiles(e.dataTransfer.files);
   }
 
+  onMount(() => {
+    // Bring the inline editor into view beneath the last message.
+    if (inline) requestAnimationFrame(() => card?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+  });
+
   const savedLabel = $derived(composer.saving ? "Saving…" : composer.lastSaved ? "Saved" : "");
 </script>
 
-<Sheet onclose={() => composer.close()} width={760} full>
+{#if inline}
+  <div class="card" bind:this={card}>{@render body()}</div>
+{:else}
+  <Sheet onclose={() => composer.close()} width={760} full>{@render body()}</Sheet>
+{/if}
+
+{#snippet body()}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="compose" {onkeydown} ondragover={(e) => e.preventDefault()} {ondrop}>
+  <div class="compose" class:inline {onkeydown} ondragover={(e) => e.preventDefault()} {ondrop}>
     <header>
       <button class="icon-btn" aria-label="Close" title="Close (saves draft)" onclick={() => composer.close()}><X size={20} strokeWidth={1.7} /></button>
       <span class="title">{title}</span>
       <span class="saved">{savedLabel}</span>
       <div class="actions">
+        {#if inline}
+          <button class="icon-btn" aria-label="Open in window" title="Open in window" onclick={() => composer.popOut()}><Maximize2 size={17} strokeWidth={1.7} /></button>
+        {/if}
         <button class="icon-btn" aria-label="Attach" title="Attach files" onclick={() => fileInput?.click()}><Paperclip size={19} strokeWidth={1.7} /></button>
         <button class="send" aria-label="Send" title="Send (⌘↩)" onclick={() => composer.send()}>
           <ArrowUp size={18} strokeWidth={2.2} />
@@ -68,13 +91,13 @@
     </header>
 
     <div class="scroll fields">
-      <div class="field from">
+      {#if !inline || fromOptions.length > 1}<div class="field from">
         <span class="label">From</span>
         <button class="from-btn" bind:this={fromAnchor} onclick={() => (fromOpen = fromOptions.length > 1 && !fromOpen)}>
           <span>{d.from.name ? `${d.from.name} <${d.from.email}>` : d.from.email}</span>
           {#if fromOptions.length > 1}<ChevronDown size={14} strokeWidth={1.8} />{/if}
         </button>
-      </div>
+      </div>{/if}
       <RecipientField label="To" value={d.to} account={d.account} autofocus={d.mode === "new" || d.mode === "forward"} onchange={(v) => ((d.to = v), changed())}>
         {#snippet trailing()}
           {#if !showCc}<button class="ccbtn" onclick={() => (showCc = true)}>Cc/Bcc</button>{/if}
@@ -84,9 +107,11 @@
         <RecipientField label="Cc" value={d.cc} account={d.account} onchange={(v) => ((d.cc = v), changed())} />
         <RecipientField label="Bcc" value={d.bcc} account={d.account} onchange={(v) => ((d.bcc = v), changed())} />
       {/if}
-      <div class="field">
-        <input class="subject" placeholder="Subject" bind:value={d.subject} oninput={changed} enterkeyhint="next" />
-      </div>
+      {#if !inline}
+        <div class="field">
+          <input class="subject" placeholder="Subject" bind:value={d.subject} oninput={changed} enterkeyhint="next" />
+        </div>
+      {/if}
 
       <MarkdownEditor
         value={d.markdown}
@@ -138,7 +163,7 @@
       <button class="icon-btn" aria-label="Discard" title="Discard draft" onclick={() => composer.discard()}><Trash2 size={17} strokeWidth={1.7} /></button>
     </footer>
   </div>
-</Sheet>
+{/snippet}
 
 <Popover open={fromOpen} anchor={fromAnchor} onclose={() => (fromOpen = false)} align="left">
   {#each fromOptions as o (o.account + o.address.email)}
@@ -161,6 +186,21 @@
     flex-direction: column;
     height: 100%;
     min-height: 0;
+  }
+  .card {
+    margin: 20px 0 0;
+    border: 1px solid var(--line-2);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--bg);
+    scroll-margin-bottom: 24px;
+  }
+  .compose.inline .fields {
+    flex: none;
+    overflow: visible;
+  }
+  .compose.inline footer {
+    padding-bottom: 4px;
   }
   header {
     display: flex;

@@ -1,6 +1,6 @@
 import { kvGet, kvSet } from "./platform";
 
-export type SwipeAction = "archive" | "trash" | "read" | "star" | "none";
+export type SwipeAction = "archive" | "trash" | "read" | "pin" | "none";
 
 export interface Settings {
   swipeRight: SwipeAction;
@@ -55,7 +55,10 @@ class SettingsStore {
 
   async load() {
     const saved = await kvGet<Partial<Settings>>("settings");
-    this.value = { ...DEFAULTS, ...(saved ?? {}) };
+    const merged = { ...DEFAULTS, ...(saved ?? {}) };
+    // Starring was replaced by pinning.
+    for (const k of ["swipeLeft", "swipeRight"] as const) if ((merged[k] as string) === "star") merged[k] = "pin";
+    this.value = merged;
     this.loaded = true;
     this.applyTheme();
   }
@@ -80,7 +83,7 @@ export const SWIPE_LABELS: Record<SwipeAction, string> = {
   archive: "Archive",
   trash: "Delete",
   read: "Mark read / unread",
-  star: "Star",
+  pin: "Pin / unpin",
   none: "None",
 };
 

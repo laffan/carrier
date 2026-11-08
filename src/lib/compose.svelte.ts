@@ -97,6 +97,14 @@ function prefixed(subject: string, prefix: "Re:" | "Fwd:"): string {
 
 class Composer {
   draft = $state<Draft | null>(null);
+  /**
+   * Replies and forwards are written inline, beneath the conversation; new
+   * messages and reopened drafts use the compose sheet.
+   */
+  inline = $state(false);
+  /** Gmail message ids this draft has been saved as (hidden from the open conversation). */
+  savedMessageIds = $state<string[]>([]);
+  private closing = false;
   saving = $state(false);
   lastSaved = $state<number | null>(null);
   loadingAttachments = $state(false);
@@ -139,9 +147,11 @@ class Composer {
 
   // ---- opening ------------------------------------------------------------
 
-  private async begin(d: Omit<Draft, "signature" | "includeSignature">) {
+  private async begin(d: Omit<Draft, "signature" | "includeSignature">, inline = false) {
     if (this.draft) await this.close();
     const signature = await this.signatureFor(d.from.email);
+    this.inline = inline;
+    this.savedMessageIds = [];
     this.draft = { ...d, signature, includeSignature: true };
     this.lastSaved = null;
     this.savedHash = this.hash();
@@ -207,7 +217,7 @@ class Composer {
       inReplyTo: message.messageId || undefined,
       references: [message.references, message.messageId].filter(Boolean).join(" ") || undefined,
       mode,
-    });
+    }, true);
   }
 
   async openForward(thread: Thread, message: Message) {
@@ -237,7 +247,7 @@ class Composer {
       inReplyTo: message.messageId || undefined,
       references: [message.references, message.messageId].filter(Boolean).join(" ") || undefined,
       mode: "forward",
-    });
+    }, true);
     const files = message.attachments.filter((a) => !a.inline);
     if (files.length) {
       this.loadingAttachments = true;
@@ -273,6 +283,8 @@ class Composer {
       }
       const isReply = !!message.references || threadId !== message.id;
       if (this.draft) await this.close();
+      this.inline = false;
+      this.savedMessageIds = [];
       this.draft = {
         account,
         from: message.from.email ? message.from : this.defaultFrom(account).address,
@@ -307,6 +319,22 @@ class Composer {
       this.loadingAttachments = false;
       app.handleError(e, account);
     }
+  }
+
+  /** Whether the inline draft belongs to this conversation. */
+  isInlineFor(account: string, threadId: string): boolean {
+    const d = this.draft;
+    return !!d && this.inline && d.account === account && d.threadId === threadId;
+  }
+
+  /** Moves an inline reply or forward into the compose sheet. */
+  popOut() {
+    this.inline = false;
+  }
+
+  /** Where a restored message reopens: inline if its conversation is still open. */
+  private restoreInline(d: Draft, wasInline: boolean): boolean {
+    return wasInline && !!app.open && app.open.account === d.account && app.open.id === d.threadId;
   }
 
   // ---- editing ------------------------------------------------------------
@@ -410,6 +438,7 @@ class Composer {
         await kvSet(`draftbody:${ref.draftId}`, body);
         if (this.draft && (this.draft.draftId === snapshot.draftId || !this.draft.draftId)) {
           this.draft.draftId = ref.draftId;
+          this.savedMessageIds = [...this.savedMessageIds, ref.messageId];
           if (!this.draft.threadId && snapshot.mode !== "new") this.draft.threadId = ref.threadId;
         }
         if (this.hash() === hash) this.savedHash = hash;
@@ -427,12 +456,17 @@ class Composer {
   /** Closes compose, keeping the message as a draft (Gmail behavior). */
   async close() {
     const d = this.draft;
-    if (!d) return;
+    if (!d || this.closing) return;
     clearTimeout(this.saveTimer);
     const shouldSave = this.dirty && !this.isEmpty;
     if (shouldSave) {
-      await this.save();
-      this.draft = null;
+      this.closing = true;
+      try {
+        await this.save();
+      } finally {
+        this.closing = false;
+      }
+      if (this.draft === d) this.draft = null;
       toasts.show("Saved to Drafts");
       app.afterSend();
     } else this.draft = null;
@@ -475,14 +509,17 @@ class Composer {
     if (this.savePromise) await this.savePromise;
     const snapshot = $state.snapshot(this.draft!) as Draft;
     const raw = this.build(snapshot);
+    const wasInline = this.inline;
     this.draft = null;
-    const go = () => this.deliver(snapshot, raw);
+    const go = () => this.deliver(snapshot, raw, wasInline);
     const secs = settings.value.undoSendSeconds;
     if (secs > 0) {
       toasts.show("Sending…", {
         action: "Undo",
         duration: secs * 1000,
-        onAction: () => {
+        onAction: async () => {
+          if (this.draft) await this.close();
+          this.inline = this.restoreInline(snapshot, wasInline);
           this.draft = snapshot;
           this.savedHash = "";
         },
@@ -491,7 +528,7 @@ class Composer {
     } else await go();
   }
 
-  private async deliver(d: Draft, raw: string) {
+  private async deliver(d: Draft, raw: string, wasInline: boolean) {
     try {
       const b = app.backend(d.account);
       await b.send(raw, d.threadId);
@@ -505,6 +542,8 @@ class Composer {
     } catch (e) {
       app.handleError(e, d.account);
       // Put it back so nothing is lost.
+      if (this.draft) await this.close();
+      this.inline = this.restoreInline(d, wasInline);
       this.draft = d;
       this.savedHash = "";
       toasts.error("Couldn't send. Your message is still open.");

@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { Menu, Search, SquarePen, X, Archive, Trash2, MailOpen, Mail, Star, Ellipsis, ArrowLeft, Inbox } from "@lucide/svelte";
+  import { Menu, Search, SquarePen, X, Archive, Trash2, MailOpen, Mail, Pin, Ellipsis, ArrowLeft, Inbox } from "@lucide/svelte";
   import { app, ALL, threadKey } from "../lib/app.svelte";
   import { composer } from "../lib/compose.svelte";
   import { settings, type SwipeAction } from "../lib/settings.svelte";
   import ThreadRow from "./ThreadRow.svelte";
   import Popover from "./Popover.svelte";
   import LabelPicker from "./LabelPicker.svelte";
+  import type { ThreadSummary } from "../lib/mail/types";
 
   interface Props {
     persistentSidebar: boolean;
@@ -28,7 +29,7 @@
   const selected = $derived([...app.selection]);
   const selectedThreads = $derived(app.threads.filter((t) => app.selection.has(threadKey(t))));
   const anyUnread = $derived(selectedThreads.some((t) => t.unread));
-  const allStarred = $derived(selectedThreads.length > 0 && selectedThreads.every((t) => t.starred));
+  const allPinned = $derived(selectedThreads.length > 0 && selectedThreads.every((t) => t.pinned));
   const label = $derived(app.viewLabel);
   const inTrash = $derived(label === "TRASH");
   const inSpam = $derived(label === "SPAM");
@@ -93,7 +94,7 @@
   function removes(a: SwipeAction): boolean {
     if (a === "trash") return true;
     if (a === "archive") return app.isInboxView || inTrash || inSpam || app.current === ALL;
-    if (a === "star") return label === "STARRED";
+    if (a === "pin") return label === "PINNED";
     return false;
   }
 
@@ -105,7 +106,7 @@
       else app.archive(k);
     } else if (a === "trash") app.trash(k);
     else if (a === "read") app.toggleRead(k);
-    else if (a === "star") app.toggleStar(k);
+    else if (a === "pin") app.togglePin(k);
   }
 
   function toggleCheck(t: { account: string; id: string }) {
@@ -145,6 +146,10 @@
   }
 
   const draftsMore = $derived(Math.max(0, app.draftsTotal - app.drafts.length));
+  // app.threads keeps pinned conversations first; they get their own section.
+  const pinnedRows = $derived(app.showsPinned ? app.threads.filter((t) => t.pinned) : []);
+  const restRows = $derived(app.showsPinned ? app.threads.filter((t) => !t.pinned) : app.threads);
+  const showDrafts = $derived(app.showsDrafts && app.drafts.length > 0 && !selecting);
 
   async function openRow(t: (typeof app.threads)[number]) {
     // Draft-only conversations open straight into compose.
@@ -160,6 +165,25 @@
     app.openThread(t);
   }
 </script>
+
+{#snippet row(t: ThreadSummary)}
+  <ThreadRow
+    thread={t}
+    active={!!app.open && threadKey(app.open) === threadKey(t)}
+    checked={app.selection.has(threadKey(t))}
+    {selecting}
+    showAccount={app.current === ALL}
+    color={app.accountColor(t.account)}
+    sentView={label === "SENT"}
+    swipeLeft={settings.value.swipeLeft}
+    swipeRight={settings.value.swipeRight}
+    {removes}
+    onopen={() => openRow(t)}
+    oncheck={() => toggleCheck(t)}
+    onswipe={(a) => swipe(t, a)}
+    onpin={() => app.togglePin([threadKey(t)])}
+  />
+{/snippet}
 
 <section class="list">
   <header>
@@ -183,8 +207,8 @@
           <button class="icon-btn" aria-label={anyUnread ? "Mark read" : "Mark unread"} title={anyUnread ? "Mark read" : "Mark unread"} onclick={() => app.setRead(selected, anyUnread)}>
             {#if anyUnread}<MailOpen size={19} strokeWidth={1.7} />{:else}<Mail size={19} strokeWidth={1.7} />{/if}
           </button>
-          <button class="icon-btn" class:on={allStarred} aria-label="Star" title="Star" onclick={() => app.setStar(selected, !allStarred)}>
-            <Star size={19} strokeWidth={1.7} fill={allStarred ? "currentColor" : "none"} />
+          <button class="icon-btn" class:on={allPinned} aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin to top"} onclick={() => app.setPin(selected, !allPinned)}>
+            <Pin size={19} strokeWidth={1.7} fill={allPinned ? "currentColor" : "none"} />
           </button>
           <button class="icon-btn" aria-label="More" bind:this={moreAnchor} onclick={() => (moreOpen = !moreOpen)}><Ellipsis size={19} strokeWidth={1.7} /></button>
         {/if}
@@ -240,7 +264,11 @@
     {:else if !app.threads.length && !app.drafts.length}
       <div class="empty"><p class="muted">{app.view.kind === "search" ? "No results" : `Nothing in ${app.viewTitle}`}</p></div>
     {:else}
-      {#if app.showsDrafts && app.drafts.length && !selecting}
+      {#if pinnedRows.length}
+        <div class="section"><span>Pinned</span></div>
+        {#each pinnedRows as t (threadKey(t))}{@render row(t)}{/each}
+      {/if}
+      {#if showDrafts}
         <div class="section">
           <span>Drafts</span>
           {#if draftsMore > 0}
@@ -263,31 +291,16 @@
             onopen={() => openDraftRow(t)}
             oncheck={() => {}}
             onswipe={() => {}}
-            onstar={() => {}}
+            onpin={() => {}}
           />
         {/each}
+      {/if}
+      {#if (pinnedRows.length || showDrafts) && restRows.length}
         <div class="section">
-          <span>{app.current === ALL ? "Inbox" : app.viewTitle}</span>
+          <span>{app.current === ALL && app.isInboxView ? "Inbox" : app.viewTitle}</span>
         </div>
       {/if}
-      {#each app.threads as t (threadKey(t))}
-        <ThreadRow
-          thread={t}
-          active={!!app.open && threadKey(app.open) === threadKey(t)}
-          checked={app.selection.has(threadKey(t))}
-          {selecting}
-          showAccount={app.current === ALL}
-          color={app.accountColor(t.account)}
-          sentView={label === "SENT"}
-          swipeLeft={settings.value.swipeLeft}
-          swipeRight={settings.value.swipeRight}
-          {removes}
-          onopen={() => openRow(t)}
-          oncheck={() => toggleCheck(t)}
-          onswipe={(a) => swipe(t, a)}
-          onstar={() => app.toggleStar([threadKey(t)])}
-        />
-      {/each}
+      {#each restRows as t (threadKey(t))}{@render row(t)}{/each}
       <div bind:this={sentinel} class="sentinel">
         {#if app.loadingMore}<span class="spinner"></span>{/if}
       </div>

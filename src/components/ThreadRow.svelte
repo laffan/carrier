@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Archive, Trash2, MailOpen, Mail, Star, Paperclip } from "@lucide/svelte";
+  import { Archive, Trash2, MailOpen, Mail, Pin, PinOff, Paperclip } from "@lucide/svelte";
   import type { ThreadSummary } from "../lib/mail/types";
   import type { SwipeAction } from "../lib/settings.svelte";
   import { listDate } from "../lib/util";
@@ -22,10 +22,10 @@
     onopen: () => void;
     oncheck: () => void;
     onswipe: (a: SwipeAction) => void;
-    onstar: () => void;
+    onpin: () => void;
   }
 
-  let { thread, active, checked, selecting, showAccount, color, sentView, draftView = false, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onstar }: Props = $props();
+  let { thread, active, checked, selecting, showAccount, color, sentView, draftView = false, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onpin }: Props = $props();
 
   let row: HTMLDivElement;
   let dx = $state(0);
@@ -119,7 +119,7 @@
     if (a === "archive") return Archive;
     if (a === "trash") return Trash2;
     if (a === "read") return thread.unread ? MailOpen : Mail;
-    if (a === "star") return Star;
+    if (a === "pin") return thread.pinned ? PinOff : Pin;
     return null;
   }
 
@@ -140,7 +140,7 @@
 <div
   class="wrap"
   class:collapsing
-  style:--bgc={action === "archive" ? "var(--swipe-archive)" : action === "trash" ? "var(--swipe-trash)" : action === "read" ? "var(--swipe-read)" : action === "star" ? "var(--swipe-star)" : "var(--bg-3)"}
+  style:--bgc={action === "archive" ? "var(--swipe-archive)" : action === "trash" ? "var(--swipe-trash)" : action === "read" ? "var(--swipe-read)" : action === "pin" ? "var(--swipe-pin)" : "var(--bg-3)"}
 >
   <span class="pill" style:--c={color} aria-hidden="true"></span>
   {#if dx !== 0}
@@ -192,16 +192,17 @@
       <div class="line3">
         <span class="snippet">{draftView ? thread.draft?.snippet || "" : thread.snippet}</span>
         {#if !draftView}<button
-          class="star"
-          class:on={thread.starred}
-          aria-label={thread.starred ? "Unstar" : "Star"}
+          class="pin"
+          class:on={thread.pinned}
+          aria-label={thread.pinned ? "Unpin" : "Pin"}
+          title={thread.pinned ? "Unpin" : "Pin to top"}
           onpointerdown={(e) => e.stopPropagation()}
           onclick={(e) => {
             e.stopPropagation();
-            onstar();
+            onpin();
           }}
         >
-          <Star size={15} strokeWidth={1.7} fill={thread.starred ? "currentColor" : "none"} />
+          <Pin size={15} strokeWidth={1.7} fill={thread.pinned ? "currentColor" : "none"} />
         </button>{/if}
       </div>
       {#if showAccount}<div class="acct">{thread.account}</div>{/if}
@@ -399,7 +400,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .star {
+  .pin {
     color: var(--text-3);
     display: flex;
     padding: 2px;
@@ -407,20 +408,20 @@
     opacity: 0;
     transition: opacity 0.12s;
   }
-  .row:hover .star,
-  .star.on {
+  .row:hover .pin,
+  .pin.on {
     opacity: 1;
   }
   @media (hover: none) {
-    .star {
+    .pin {
       opacity: 1;
     }
-    .star:not(.on) {
+    .pin:not(.on) {
       color: var(--line-2);
     }
   }
-  .star.on {
-    color: var(--star);
+  .pin.on {
+    color: var(--pin);
   }
   .acct {
     font-size: 11px;

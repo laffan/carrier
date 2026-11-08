@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { app, threadKey } from "./lib/app.svelte";
   import { composer } from "./lib/compose.svelte";
   // The composer (with CodeMirror) loads on first use to keep startup light.
@@ -16,6 +16,15 @@
 
   const twoPane = $derived(width >= 900);
   const persistentSidebar = $derived(width >= 1280);
+
+  // An inline reply lives under its conversation: leaving the conversation
+  // keeps it as a draft, as in Gmail.
+  $effect(() => {
+    const d = composer.draft;
+    if (!d || !composer.inline) return;
+    const here = !!app.open && app.open.account === d.account && app.open.id === d.threadId;
+    if (!here) untrack(() => composer.close());
+  });
 
   onMount(() => {
     app.init();
@@ -52,14 +61,15 @@
     const t = e.target as HTMLElement | null;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (composer.draft || settingsOpen) return;
+    // Shortcuts stay on beside an inline reply (the editor itself is excluded above).
+    if ((composer.draft && !composer.inline) || settingsOpen) return;
     const key = e.key;
     const open = app.open ? [threadKey(app.open)] : [];
     const targets = app.selection.size ? [...app.selection] : open;
 
     if (pendingG) {
       pendingG = false;
-      const map: Record<string, string> = { i: "INBOX", s: "STARRED", t: "SENT", d: "DRAFT", a: "ALL" };
+      const map: Record<string, string> = { i: "INBOX", p: "PINNED", t: "SENT", d: "DRAFT", a: "ALL" };
       if (map[key]) {
         e.preventDefault();
         app.setView({ kind: "label", label: map[key] });
@@ -105,8 +115,8 @@
       case "Delete":
         if (targets.length) app.trash(targets);
         return;
-      case "s":
-        if (targets.length) app.toggleStar(targets);
+      case "p":
+        if (targets.length) app.togglePin(targets);
         return;
       case "U":
         if (app.selection.size) app.setRead(targets, false);
@@ -184,7 +194,7 @@
   {/if}
 {/if}
 
-{#if composer.draft}
+{#if composer.draft && !composer.inline}
   {#await loadCompose() then { default: Compose }}
     <Compose />
   {/await}

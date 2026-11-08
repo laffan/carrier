@@ -18,7 +18,7 @@
   const folders = $derived([
     "INBOX",
     ...(primary ? ["CATEGORY_SOCIAL", "CATEGORY_PROMOTIONS", "CATEGORY_UPDATES", "CATEGORY_FORUMS"] : []),
-    "STARRED",
+    "PINNED",
     "IMPORTANT",
     "SENT",
     "DRAFT",
@@ -106,7 +106,7 @@
     <div class="group">
       {#each folders as id, i (id)}
         {#if i === 1 && primary}<div class="sep"></div>{/if}
-        {#if id === "STARRED"}<div class="sep"></div>{/if}
+        {#if id === "PINNED"}<div class="sep"></div>{/if}
         <button class="item" class:active={isActive(id)} class:indent={id.startsWith("CATEGORY_")} onclick={() => go(id)}>
           <span>{name(id)}</span>
           <span class="count">{count(id)}</span>

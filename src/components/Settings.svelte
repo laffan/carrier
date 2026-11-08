@@ -41,7 +41,7 @@
     saveSig(email);
   }
 
-  const swipeOptions: SwipeAction[] = ["archive", "trash", "read", "star", "none"];
+  const swipeOptions: SwipeAction[] = ["archive", "trash", "read", "pin", "none"];
 </script>
 
 <Sheet {onclose} width={620} full>

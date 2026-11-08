@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowLeft, Archive, Trash2, Mail, Ellipsis, Reply, ReplyAll, Forward, Inbox, FolderInput, Tag, Star } from "@lucide/svelte";
+  import { ArrowLeft, Archive, Trash2, Mail, Ellipsis, Reply, ReplyAll, Forward, Inbox, FolderInput, Tag, Pin } from "@lucide/svelte";
   import { app, threadKey } from "../lib/app.svelte";
   import { composer } from "../lib/compose.svelte";
   import { contacts } from "../lib/contacts.svelte";
@@ -7,6 +7,8 @@
   import MessageItem from "./MessageItem.svelte";
   import Popover from "./Popover.svelte";
   import LabelPicker from "./LabelPicker.svelte";
+  // Shares the lazily loaded composer chunk with App.
+  const loadCompose = () => import("./Compose.svelte");
 
   interface Props {
     showBack: boolean;
@@ -26,7 +28,11 @@
   const inInbox = $derived(labels.includes("INBOX"));
   const inTrash = $derived(labels.includes("TRASH"));
   const inSpam = $derived(labels.includes("SPAM"));
-  const starred = $derived(labels.includes("STARRED"));
+  const pinned = $derived(labels.includes("PINNED"));
+  /** A reply or forward to this conversation is being written beneath it. */
+  const replying = $derived(!!thread && composer.isInlineFor(thread.account, thread.id));
+  // Hide the Gmail copy of the draft being edited inline.
+  const shown = $derived(thread?.messages.filter((m) => !(replying && composer.savedMessageIds.includes(m.id))) ?? []);
   const real = $derived(thread?.messages.filter((m) => !m.labelIds.includes("DRAFT")) ?? []);
   const lastReal = $derived(real[real.length - 1]);
   const userLabels = $derived.by(() => {
@@ -98,8 +104,8 @@
           {/if}
           <button class="icon-btn" aria-label="Delete" title="Delete (#)" onclick={() => app.trash(keys)}><Trash2 size={19} strokeWidth={1.7} /></button>
           <button class="icon-btn" aria-label="Mark unread" title="Mark unread (shift+u)" onclick={() => app.markOpenUnread()}><Mail size={19} strokeWidth={1.7} /></button>
-          <button class="icon-btn" class:on={starred} aria-label="Star" title="Star (s)" onclick={() => app.toggleStar(keys)}>
-            <Star size={19} strokeWidth={1.7} fill={starred ? "currentColor" : "none"} />
+          <button class="icon-btn" class:on={pinned} aria-label={pinned ? "Unpin" : "Pin"} title={pinned ? "Unpin (p)" : "Pin to top (p)"} onclick={() => app.togglePin(keys)}>
+            <Pin size={19} strokeWidth={1.7} fill={pinned ? "currentColor" : "none"} />
           </button>
           <button class="icon-btn" aria-label="More" bind:this={moreAnchor} onclick={() => (moreOpen = !moreOpen)}><Ellipsis size={19} strokeWidth={1.7} /></button>
         {/if}
@@ -123,10 +129,14 @@
             {#each userLabels as l (l.id)}<span class="label">{l.name}</span>{/each}
           </div>
         {/if}
-        {#each thread.messages as m (m.id)}
+        {#each shown as m (m.id)}
           <MessageItem thread={thread} message={m} expanded={expanded.has(m.id)} ontoggle={() => toggle(m.id)} />
         {/each}
-        {#if lastReal}
+        {#if replying}
+          {#await loadCompose() then { default: Compose }}
+            <Compose inline />
+          {/await}
+        {:else if lastReal}
           <div class="replybar">
             {#if settings.value.defaultReply === "replyAll" && multipleRecipients}
               <button class="pill" onclick={() => reply("replyAll")}><ReplyAll size={16} strokeWidth={1.7} /> Reply all</button>

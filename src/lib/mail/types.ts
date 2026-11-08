@@ -26,7 +26,8 @@ export interface ThreadSummary {
   date: number;
   labelIds: string[];
   unread: boolean;
-  starred: boolean;
+  /** Pinned to the top of the list (Carrier's "Pinned" label). */
+  pinned: boolean;
   hasAttachments: boolean;
   hasDraft: boolean;
   /** The latest unsent draft in the conversation, if any. */

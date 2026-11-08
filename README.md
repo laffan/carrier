@@ -72,14 +72,15 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
 ### Implemented (Gmail parity)
 
 - **Accounts.** Sign in with Google, for multiple personal and Workspace accounts, with an *All inboxes* view, an account switcher, and a re-sign-in prompt when a token is revoked.
-- **Mailboxes.** Primary, Social, Promotions, Updates, Forums, Starred, Important, Sent, Drafts, All mail, Spam, Trash and your Gmail labels, with unread counts. Settings › Inbox type switches between Primary and Everything.
+- **Mailboxes.** Primary, Social, Promotions, Updates, Forums, Pinned, Important, Sent, Drafts, All mail, Spam, Trash and your Gmail labels, with unread counts. Settings › Inbox type switches between Primary and Everything.
 - **List.**
+  - Pinned conversations sit at the top of every list in a Pinned section, above the Inbox's Drafts section. Pin one with the pin icon on its row or in the conversation's toolbar.
   - Inbox opens with a Drafts section (latest 5 drafts across the accounts in view, with a link to the rest); tapping one reopens it in compose.
-  - Conversations, with participants, message counts, a draft marker, attachment indicator and star.
+  - Conversations, with participants, message counts, a draft marker, attachment indicator and pin.
   - Pull to refresh, infinite scroll, and a refresh every 60 seconds while the app is visible.
   - The last list is cached for an instant start.
-- **Swipe actions.** Configurable for each direction: archive, delete, mark read/unread, star, or none. Defaults are right = archive and left = delete. Every destructive action shows an **Undo** snackbar.
-- **Multi-select.** Long-press a row (⌘-click on a Mac). Selected conversations can be archived, deleted, marked read/unread, starred, moved, reported as spam, or all selected at once.
+- **Swipe actions.** Configurable for each direction: archive, delete, mark read/unread, pin/unpin, or none. Defaults are right = archive and left = delete. Every destructive action shows an **Undo** snackbar.
+- **Multi-select.** Long-press a row (⌘-click on a Mac). Selected conversations can be archived, deleted, marked read/unread, pinned, moved, reported as spam, or all selected at once.
 - **Conversation view.**
   - Unread messages and the latest message open expanded.
   - The full header (from, to, cc, date) opens with a tap.
@@ -88,9 +89,10 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
   - Inline images, a remote-image toggle, and link handling (http and mailto).
 - **Actions.**
   - Archive, delete, delete forever, empty Trash or Spam, restore, mark unread, mark unread from here.
-  - Star a message or a conversation, move to a folder, apply labels, report spam, not spam.
+  - Pin a conversation, move to a folder, apply labels, report spam, not spam.
 - **Compose.**
-  - Reply, reply all and forward. Forwarding includes the original attachments.
+  - Reply, reply all and forward open an editor beneath the conversation's last message, as in Gmail on the web. Leaving the conversation keeps the reply as a draft; the expand button moves it into a window. New messages and reopened drafts use the compose window.
+  - Forwarding includes the original attachments.
   - Choose the From address from any account or send-as alias.
   - To/Cc/Bcc fields with autocomplete.
   - Attach files or photos, or drag them in.
@@ -108,17 +110,21 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
   | `j` / `k` | Next / previous conversation |
   | `e` | Archive |
   | `#` | Delete |
-  | `s` | Star |
+  | `p` | Pin / unpin |
   | `r` / `a` / `f` | Reply / reply all / forward |
   | `shift+u` / `shift+i` | Mark unread / read |
   | `!` | Report spam |
   | `x` | Select |
   | `u` or `esc` | Back |
-  | `g` then `i` / `s` / `t` / `d` / `a` | Go to Inbox / Starred / Sent / Drafts / All mail |
+  | `g` then `i` / `p` / `t` / `d` / `a` | Go to Inbox / Pinned / Sent / Drafts / All mail |
   | `⌘↩` | Send |
   | `⌘B` / `⌘I` / `⌘K` / `⌘E` / `⌘⇧X` | Bold / italic / link / code / strikethrough (in the editor) |
 
 - **Appearance.** Light, dark and system themes. Messages always sit on the app background; in dark mode, designed HTML mail is colour-inverted (images kept) so it stays readable. Each account has a colour, shown as a glowing bar at the window's left edge beside its messages (change it in Settings). Two panes on a landscape iPad or a Mac, and a persistent sidebar on wide screens.
+
+### Pinning
+
+Gmail has no pinning, so Carrier stores pins as a Gmail label named **Pinned**, created the first time you pin something in an account. Pins therefore sync between devices and show as that label in Gmail itself. Carrier hides the label from its Labels list and shows it as the *Pinned* mailbox instead. Pinning replaces starring: Carrier no longer stars or unstars, and existing stars are left as they are in Gmail (`is:starred` still finds them).
 
 ### Markdown
 

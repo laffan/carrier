@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Reply, ReplyAll, Forward, Ellipsis, Star } from "@lucide/svelte";
+  import { Reply, ReplyAll, Forward, Ellipsis } from "@lucide/svelte";
   import { app } from "../lib/app.svelte";
   import { composer } from "../lib/compose.svelte";
   import { displayName } from "../lib/mail/mime";
@@ -27,7 +27,6 @@
     new Set([thread.account.toLowerCase(), ...(account?.sendAs ?? []).map((s) => s.email.toLowerCase())]),
   );
   const isDraft = $derived(message.labelIds.includes("DRAFT"));
-  const starred = $derived(message.labelIds.includes("STARRED"));
   const fromMe = $derived(mine.has(message.from.email.toLowerCase()));
   const recipients = $derived(
     [...message.to, ...message.cc]
@@ -37,18 +36,6 @@
 
   function reply(mode: "reply" | "replyAll") {
     composer.openReply(thread, message, mode);
-  }
-
-  async function toggleStar(e: Event) {
-    e.stopPropagation();
-    const on = !starred;
-    message.labelIds = on ? [...message.labelIds, "STARRED"] : message.labelIds.filter((l) => l !== "STARRED");
-    try {
-      await app.backend(thread.account).modifyMessages([message.id], on ? ["STARRED"] : [], on ? [] : ["STARRED"]);
-      app.refresh();
-    } catch (err) {
-      app.handleError(err, thread.account);
-    }
   }
 
   async function markUnreadFromHere() {
@@ -94,9 +81,6 @@
     </div>
     {#if expanded && !isDraft}
       <div class="tools">
-        <button class="icon-btn small" class:on={starred} aria-label="Star" onclick={toggleStar}>
-          <Star size={16} strokeWidth={1.7} fill={starred ? "currentColor" : "none"} />
-        </button>
         <button class="icon-btn small" aria-label="Reply" onclick={(e) => (e.stopPropagation(), reply("reply"))}><Reply size={17} strokeWidth={1.7} /></button>
         <button class="icon-btn small" aria-label="More" bind:this={menuAnchor} onclick={(e) => (e.stopPropagation(), (menuOpen = !menuOpen))}>
           <Ellipsis size={17} strokeWidth={1.7} />

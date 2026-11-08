@@ -32,6 +32,7 @@ export const SYSTEM_NAMES: Record<string, string> = {
   CATEGORY_PROMOTIONS: "Promotions",
   CATEGORY_UPDATES: "Updates",
   CATEGORY_FORUMS: "Forums",
+  PINNED: "Pinned",
   STARRED: "Starred",
   IMPORTANT: "Important",
   SENT: "Sent",
@@ -50,7 +51,14 @@ function splitKey(key: string): { account: string; id: string } {
   return { account: key.slice(0, i), id: key.slice(i + 1) };
 }
 
+/** Pinned conversations first, then newest first. */
+function byPinThenDate(a: ThreadSummary, b: ThreadSummary): number {
+  return Number(b.pinned) - Number(a.pinned) || b.date - a.date;
+}
+
 const PAGE = 30;
+/** Most pinned conversations fetched per account for the top of a list. */
+const PINNED_MAX = 50;
 /** How many drafts the Inbox's Drafts section shows. */
 const DRAFTS_SHOWN = 5;
 
@@ -332,6 +340,11 @@ class App {
     return m;
   }
 
+  /** Whether the current list starts with a Pinned section (every list except Pinned itself). */
+  get showsPinned(): boolean {
+    return !(this.view.kind === "label" && this.view.label === "PINNED");
+  }
+
   /** Whether the current view shows the Drafts section (Inbox / All inboxes). */
   get showsDrafts(): boolean {
     return this.view.kind === "label" && this.view.label === "INBOX";
@@ -393,12 +406,20 @@ class App {
   private async fetchFirstPages(): Promise<ThreadSummary[]> {
     const query = this.queryFor(this.view);
     const accounts = this.accountsInView.filter((a) => !this.account(a)?.needsReauth);
+    // Pinned conversations are fetched separately so they show even when older than the first page.
+    const pinnedQuery = this.showsPinned ? { ...query, labelIds: [...(query.labelIds ?? []), "PINNED"], maxResults: PINNED_MAX } : null;
     const results = await Promise.allSettled(
       accounts.map(async (email) => {
-        const r = await this.backend(email).listThreads({ ...query, maxResults: PAGE }, this.summaries(email));
+        const b = this.backend(email);
+        const [r, pinned] = await Promise.all([
+          b.listThreads({ ...query, maxResults: PAGE }, this.summaries(email)),
+          pinnedQuery ? b.listThreads(pinnedQuery, this.summaries(email)).then((x) => x.threads) : [],
+        ]);
         this.pageTokens.set(email, r.nextPageToken);
-        r.threads.forEach((t) => this.summaries(email).set(t.id, t));
-        return r.threads;
+        const ids = new Set(pinned.map((t) => t.id));
+        const all = [...pinned, ...r.threads.filter((t) => !ids.has(t.id))];
+        all.forEach((t) => this.summaries(email).set(t.id, t));
+        return all;
       }),
     );
     const out: ThreadSummary[] = [];
@@ -413,7 +434,7 @@ class App {
     });
     if (failures && failures === results.length) throw (results[0] as PromiseRejectedResult).reason;
     this.hasMore = accounts.some((a) => this.pageTokens.get(a));
-    return out.sort((a, b) => b.date - a.date);
+    return out.sort(byPinThenDate);
   }
 
   /** Pull-to-refresh / periodic refresh: keeps already-loaded pages. */
@@ -425,8 +446,9 @@ class App {
       const fresh = await this.fetchFirstPages();
       if (gen !== this.generation) return;
       const seen = new Set(fresh.map(threadKey));
-      const oldest = fresh.length ? fresh[fresh.length - 1].date : Infinity;
-      const tail = this.threads.filter((t) => !seen.has(threadKey(t)) && t.date < oldest);
+      const unpinned = fresh.filter((t) => !t.pinned);
+      const oldest = unpinned.length ? unpinned[unpinned.length - 1].date : Infinity;
+      const tail = this.threads.filter((t) => !seen.has(threadKey(t)) && !t.pinned && t.date < oldest);
       this.threads = [...fresh, ...tail];
       cacheSet(this.cacheKey(), fresh.slice(0, PAGE));
       this.refreshCounts();
@@ -459,7 +481,7 @@ class App {
       if (gen !== this.generation) return;
       const seen = new Set(this.threads.map(threadKey));
       const more = pages.flat().filter((t) => !seen.has(threadKey(t)));
-      this.threads = [...this.threads, ...more].sort((a, b) => b.date - a.date);
+      this.threads = [...this.threads, ...more].sort(byPinThenDate);
       this.hasMore = this.accountsInView.some((a) => this.pageTokens.get(a));
     } catch (e) {
       this.handleError(e);
@@ -528,20 +550,22 @@ class App {
   /** Applies label changes to the local list and open thread immediately. */
   private patchLocal(keys: string[], add: string[], remove: string[]) {
     const set = new Set(keys);
-    this.threads = this.threads.map((t) => {
+    const repins = add.includes("PINNED") || remove.includes("PINNED");
+    const patched = this.threads.map((t) => {
       if (!set.has(threadKey(t))) return t;
       const labelIds = [...t.labelIds.filter((l) => !remove.includes(l)), ...add.filter((l) => !t.labelIds.includes(l))];
       const next = {
         ...t,
         labelIds,
         unread: remove.includes("UNREAD") ? false : add.includes("UNREAD") ? true : t.unread,
-        starred: remove.includes("STARRED") ? false : add.includes("STARRED") ? true : t.starred,
+        pinned: remove.includes("PINNED") ? false : add.includes("PINNED") ? true : t.pinned,
         participants: remove.includes("UNREAD") ? t.participants.map((p) => ({ ...p, unread: false })) : t.participants,
         historyId: t.historyId + "*",
       };
       this.summaries(t.account).set(t.id, next);
       return next;
     });
+    this.threads = repins ? patched.sort(byPinThenDate) : patched;
     if (this.thread && set.has(threadKey(this.thread))) {
       const fix = (ids: string[]) => [...ids.filter((l) => !remove.includes(l)), ...add.filter((l) => !ids.includes(l))];
       this.thread = {
@@ -710,38 +734,15 @@ class App {
     await this.modify([key], ["UNREAD"], []);
   }
 
-  async setStar(keys: string[], on: boolean) {
-    if (!keys.length) return;
-    const items = this.threads.filter((t) => keys.includes(threadKey(t)));
-    this.patchLocal(keys, on ? ["STARRED"] : [], on ? [] : ["STARRED"]);
-    if (!on) {
-      const leaving = this.threads.filter((t) => keys.includes(threadKey(t)) && !this.stillInView(t.labelIds));
-      if (leaving.length) this.threads = this.threads.filter((t) => !leaving.includes(t));
-    }
-    try {
-      if (on) {
-        // Gmail stars the latest message of a conversation.
-        const byAcct = new Map<string, string[]>();
-        for (const k of keys) {
-          const { account, id } = splitKey(k);
-          const s = items.find((t) => t.account === account && t.id === id);
-          const mid = s?.lastMessageId ?? (this.thread?.id === id ? this.thread.messages.at(-1)?.id : undefined);
-          if (mid) byAcct.set(account, [...(byAcct.get(account) ?? []), mid]);
-        }
-        await Promise.all([...byAcct].map(([a, ids]) => this.backend(a).modifyMessages(ids, ["STARRED"], [])));
-      } else {
-        await Promise.all([...this.byAccount(keys)].map(([a, ids]) => this.backend(a).modifyThreads(ids, [], ["STARRED"])));
-      }
-    } catch (e) {
-      this.handleError(e);
-      this.refresh();
-    }
+  /** Pins or unpins conversations (a thread-wide label, so it survives new replies). */
+  setPin(keys: string[], on: boolean) {
+    return on ? this.modify(keys, ["PINNED"], [], undefined, false) : this.modify(keys, [], ["PINNED"], undefined, false);
   }
 
-  async toggleStar(keys: string[]) {
+  async togglePin(keys: string[]) {
     const items = this.threads.filter((t) => keys.includes(threadKey(t)));
-    const starred = items.length ? items.every((t) => t.starred) : !!this.thread?.labelIds.includes("STARRED");
-    await this.setStar(keys, !starred);
+    const pinned = items.length ? items.every((t) => t.pinned) : !!this.thread?.labelIds.includes("PINNED");
+    await this.setPin(keys, !pinned);
   }
 
   reportSpam(keys: string[]) {
@@ -775,7 +776,7 @@ class App {
   moveTo(keys: string[], target: string) {
     const remove: string[] = [];
     const l = this.viewLabel;
-    if (l && l !== target && !["STARRED", "IMPORTANT", "ALL", "SENT", "DRAFT"].includes(l)) {
+    if (l && l !== target && !["PINNED", "STARRED", "IMPORTANT", "ALL", "SENT", "DRAFT"].includes(l)) {
       remove.push(l.startsWith("CATEGORY_") ? "INBOX" : l);
     }
     if (target === "INBOX") return this.modify(keys, ["INBOX"], remove.filter((x) => x !== "INBOX"), "Moved to Inbox");

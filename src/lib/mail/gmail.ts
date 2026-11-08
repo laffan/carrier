@@ -49,10 +49,19 @@ const SUMMARY_HEADERS = ["From", "To", "Subject", "Date", "Content-Type"];
 /** System labels that the sidebar shows unread counts for. */
 const COUNTED = new Set(["INBOX", "CATEGORY_PERSONAL", "CATEGORY_SOCIAL", "CATEGORY_PROMOTIONS", "CATEGORY_UPDATES", "CATEGORY_FORUMS", "DRAFT", "SPAM"]);
 
+/**
+ * Gmail has no pinning, so pins are stored as a user label with this name.
+ * The rest of the app sees it as the virtual system label PINNED.
+ */
+const PINNED_NAME = "Pinned";
+
 export class GmailBackend implements MailBackend {
   private myAddresses = new Set<string>();
   private draftsCache: { at: number; list: DraftRef[] } | null = null;
   private contactsWarm = false;
+  /** Gmail id of the "Pinned" label: undefined = not looked up, null = doesn't exist yet. */
+  private pinnedId: string | null | undefined;
+  private pinnedLookup: Promise<string | null> | null = null;
 
   constructor(public readonly email: string) {
     this.myAddresses.add(email.toLowerCase());
@@ -126,16 +135,18 @@ export class GmailBackend implements MailBackend {
 
   async listLabels(withCounts: boolean): Promise<Label[]> {
     const res = await this.json<{ labels: { id: string; name: string; type: string }[] }>("/labels");
-    const labels: Label[] = (res.labels ?? []).map((l) => ({
-      id: l.id,
-      name: l.name,
-      type: l.type === "user" ? "user" : "system",
-    }));
+    const raw = res.labels ?? [];
+    this.pinnedId = raw.find((l) => l.type === "user" && l.name.toLowerCase() === PINNED_NAME.toLowerCase())?.id ?? null;
+    const labels: (Label & { gmailId: string })[] = raw.map((l) =>
+      l.id === this.pinnedId
+        ? { id: "PINNED", gmailId: l.id, name: PINNED_NAME, type: "system" }
+        : { id: l.id, gmailId: l.id, name: l.name, type: l.type === "user" ? "user" : "system" },
+    );
     if (withCounts) {
-      const targets = labels.filter((l) => l.type === "user" || COUNTED.has(l.id));
+      const targets = labels.filter((l) => l.type === "user" || l.id === "PINNED" || COUNTED.has(l.id));
       await pMap(targets, 8, async (l) => {
         try {
-          const d = await this.json<{ threadsUnread?: number; threadsTotal?: number }>(`/labels/${encodeURIComponent(l.id)}`);
+          const d = await this.json<{ threadsUnread?: number; threadsTotal?: number }>(`/labels/${encodeURIComponent(l.gmailId)}`);
           l.unread = d.threadsUnread ?? 0;
           l.total = d.threadsTotal ?? 0;
         } catch {
@@ -143,14 +154,59 @@ export class GmailBackend implements MailBackend {
         }
       });
     }
-    return labels;
+    if (!labels.some((l) => l.id === "PINNED")) labels.push({ id: "PINNED", gmailId: "", name: PINNED_NAME, type: "system", unread: 0, total: 0 });
+    return labels.map(({ gmailId: _, ...l }) => l);
+  }
+
+  /** The Gmail id of the Pinned label, creating the label when `create` is set. */
+  private async pinnedLabel(create: boolean): Promise<string | null> {
+    if (this.pinnedId === undefined) {
+      this.pinnedLookup ??= this.listLabels(false)
+        .then(() => this.pinnedId ?? null)
+        .finally(() => (this.pinnedLookup = null));
+      await this.pinnedLookup;
+    }
+    if (!this.pinnedId && create) {
+      try {
+        const l = await this.post<{ id: string }>("/labels", {
+          name: PINNED_NAME,
+          labelListVisibility: "labelShow",
+          messageListVisibility: "show",
+        });
+        this.pinnedId = l.id;
+      } catch (e) {
+        // Another device may have just created it.
+        if (!(e instanceof ApiError && e.status === 409)) throw e;
+        this.pinnedId = undefined;
+        await this.pinnedLabel(false);
+      }
+    }
+    return this.pinnedId ?? null;
+  }
+
+  /** Translates PINNED to the Gmail label id; null if pins are wanted but the label doesn't exist. */
+  private async toGmail(ids: string[], create = false): Promise<string[] | null> {
+    if (!ids.includes("PINNED")) return ids;
+    const real = await this.pinnedLabel(create);
+    if (!real) return null;
+    return ids.map((l) => (l === "PINNED" ? real : l));
+  }
+
+  /** Translates the Gmail Pinned label id back to PINNED. */
+  private fromGmail(ids: string[] | undefined): string[] {
+    if (!ids) return [];
+    return this.pinnedId ? ids.map((l) => (l === this.pinnedId ? "PINNED" : l)) : ids;
   }
 
   // ---- threads ------------------------------------------------------------
 
   async listThreads(query: ListQuery, cache?: Map<string, ThreadSummary>): Promise<ListResult> {
+    const labelIds = await this.toGmail(query.labelIds ?? []);
+    // Nothing can be pinned before the label exists.
+    if (!labelIds) return { threads: [] };
+    if (this.pinnedId === undefined) await this.pinnedLabel(false);
     const p = new URLSearchParams();
-    for (const l of query.labelIds ?? []) p.append("labelIds", l);
+    for (const l of labelIds) p.append("labelIds", l);
     if (query.q) p.set("q", query.q);
     if (query.pageToken) p.set("pageToken", query.pageToken);
     p.set("maxResults", String(query.maxResults ?? 30));
@@ -172,6 +228,7 @@ export class GmailBackend implements MailBackend {
     const shown = real.length ? real : msgs;
     const last = shown[shown.length - 1];
     const senders = real;
+    msgs.forEach((m) => (m.labelIds = this.fromGmail(m.labelIds)));
     const labelIds = new Set<string>();
     msgs.forEach((m) => m.labelIds?.forEach((l) => labelIds.add(l)));
     const participants: ThreadSummary["participants"] = [];
@@ -211,7 +268,7 @@ export class GmailBackend implements MailBackend {
       date: Number(last?.internalDate ?? 0),
       labelIds: [...labelIds],
       unread: msgs.some((m) => m.labelIds?.includes("UNREAD")),
-      starred: msgs.some((m) => m.labelIds?.includes("STARRED")),
+      pinned: labelIds.has("PINNED"),
       hasAttachments: msgs.some((m) => /multipart\/mixed/i.test(header(m.payload?.headers, "Content-Type"))),
       hasDraft: !!draft,
       draft,
@@ -220,6 +277,7 @@ export class GmailBackend implements MailBackend {
   }
 
   async getThread(id: string): Promise<Thread> {
+    if (this.pinnedId === undefined) await this.pinnedLabel(false);
     const t = await this.json<GmailThread>(`/threads/${id}?format=full`);
     const messages = (t.messages ?? []).map((m) => this.parseMessage(m));
     messages.sort((a, b) => a.date - b.date);
@@ -259,7 +317,7 @@ export class GmailBackend implements MailBackend {
     return {
       id: m.id,
       threadId: m.threadId,
-      labelIds: m.labelIds ?? [],
+      labelIds: this.fromGmail(m.labelIds),
       snippet: decodeEntities(m.snippet ?? ""),
       date: Number(m.internalDate ?? 0),
       from: parseAddress(decodeHeaderText(header(h, "From"))) ?? { name: "", email: "" },
@@ -276,13 +334,21 @@ export class GmailBackend implements MailBackend {
     };
   }
 
+  /** Label changes in Gmail ids. Unpinning without a Pinned label is a no-op. */
+  private async labelChange(add: string[], remove: string[]): Promise<{ addLabelIds: string[]; removeLabelIds: string[] }> {
+    const addLabelIds = (await this.toGmail(add, true))!;
+    const removeLabelIds = (await this.toGmail(remove)) ?? remove.filter((l) => l !== "PINNED");
+    return { addLabelIds, removeLabelIds };
+  }
+
   async modifyThreads(ids: string[], add: string[], remove: string[]): Promise<void> {
-    await pMap(ids, 6, (id) => this.post(`/threads/${id}/modify`, { addLabelIds: add, removeLabelIds: remove }));
+    const change = await this.labelChange(add, remove);
+    await pMap(ids, 6, (id) => this.post(`/threads/${id}/modify`, change));
   }
 
   async modifyMessages(ids: string[], add: string[], remove: string[]): Promise<void> {
     if (!ids.length) return;
-    await this.post(`/messages/batchModify`, { ids, addLabelIds: add, removeLabelIds: remove });
+    await this.post(`/messages/batchModify`, { ids, ...(await this.labelChange(add, remove)) });
   }
 
   async trashThreads(ids: string[]): Promise<void> {

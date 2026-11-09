@@ -2,7 +2,9 @@
   import DOMPurify from "dompurify";
   import { Ellipsis } from "@lucide/svelte";
   import { textToHtml } from "../lib/mail/mime";
-  import { openExternal } from "../lib/platform";
+  import { browserTarget } from "../lib/browser";
+  import { isIOS, isTauri, openExternal } from "../lib/platform";
+  import { toasts } from "../lib/toasts.svelte";
   import { composer } from "../lib/compose.svelte";
   import { settings } from "../lib/settings.svelte";
 
@@ -176,8 +178,21 @@
       e.preventDefault();
       const href = a.getAttribute("href") ?? "";
       if (/^mailto:/i.test(href)) composer.openMailto(href);
-      else if (/^https?:|^tel:/i.test(href)) openExternal(href);
+      else if (/^https?:|^tel:/i.test(href)) openLink(href);
     });
+  }
+
+  /** Opens a link, sending web links to the browser chosen in Settings. */
+  async function openLink(href: string) {
+    const target = browserTarget(href, settings.value, isTauri && !isIOS);
+    if (target.url === href && !target.openWith) return openExternal(href).catch((e) => toasts.error(String(e)));
+    try {
+      await openExternal(target.url, target.openWith);
+    } catch {
+      // The browser may not be installed: fall back to the system default.
+      toasts.show("Couldn't open the chosen browser. Opened the default one instead.");
+      await openExternal(href).catch((e) => toasts.error(String(e)));
+    }
   }
 
   $effect(() => {

@@ -18,6 +18,10 @@ export interface Settings {
   accountColors: Record<string, string>;
   /** Whether a signature was imported/edited at least once (otherwise Gmail's is used). */
   signaturesCustomized: Record<string, boolean>;
+  /** Browser for links in messages: a preset id from lib/browser.ts, or "custom". */
+  browser: string;
+  /** URL template used when `browser` is "custom". */
+  browserTemplate: string;
 }
 
 export const DEFAULTS: Settings = {
@@ -31,6 +35,8 @@ export const DEFAULTS: Settings = {
   signatures: {},
   accountColors: {},
   signaturesCustomized: {},
+  browser: "system",
+  browserTemplate: "",
 };
 
 class SettingsStore {

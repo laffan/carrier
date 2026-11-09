@@ -5,7 +5,8 @@
   import { markdownToHtml } from "../lib/mail/markdown";
   import { ACCOUNT_COLORS, settings, SWIPE_LABELS, type SwipeAction } from "../lib/settings.svelte";
   import Sheet from "./Sheet.svelte";
-  import { isTauri } from "../lib/platform";
+  import { isIOS, isTauri } from "../lib/platform";
+  import { applyTemplate, BROWSERS, CUSTOM_BROWSER, validTemplate } from "../lib/browser";
 
   interface Props {
     onclose: () => void;
@@ -42,6 +43,17 @@
   }
 
   const swipeOptions: SwipeAction[] = ["archive", "trash", "read", "pin", "none"];
+
+  /** On a Mac, presets open links in the named app instead of rewriting them. */
+  const mac = isTauri && !isIOS;
+  const EXAMPLE = "https://example.com/page?id=1";
+
+  function pickBrowser(id: string) {
+    const prev = BROWSERS.find((b) => b.id === s.browser);
+    // Start a custom template from the browser chosen before, so it can be tweaked.
+    const browserTemplate = id === CUSTOM_BROWSER && !s.browserTemplate.trim() ? (prev?.template ?? "") : s.browserTemplate;
+    settings.update({ browser: id, browserTemplate });
+  }
 </script>
 
 <Sheet {onclose} width={620} full>
@@ -167,6 +179,54 @@
           <option value="dark">Dark</option>
         </select>
       </label>
+    </section>
+
+    <section>
+      <h2>Links</h2>
+      <label class="row">
+        <span class="grow">
+          Default browser
+          <span class="sub">
+            {#if s.browser === CUSTOM_BROWSER}Web links in messages are rewritten with the template below.
+            {:else if mac}Web links in messages open in this app.
+            {:else}Web links in messages are rewritten into this browser's URL scheme. It must be installed.{/if}
+          </span>
+        </span>
+        <select value={s.browser} onchange={(e) => pickBrowser(e.currentTarget.value)}>
+          {#each BROWSERS as b (b.id)}<option value={b.id}>{b.name}</option>{/each}
+          <option value={CUSTOM_BROWSER}>Custom…</option>
+        </select>
+      </label>
+      {#if s.browser === CUSTOM_BROWSER}
+        <div class="custom">
+          <input
+            class="template"
+            type="text"
+            aria-label="Custom browser URL template"
+            placeholder={"e.g. firefox://open-url?url={url}"}
+            value={s.browserTemplate}
+            oninput={(e) => settings.update({ browserTemplate: e.currentTarget.value })}
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+          />
+          <p class="note">
+            Placeholders: <code>{"{url}"}</code> the link, encoded · <code>{"{raw}"}</code> the link as is ·
+            <code>{"{scheme}"}</code> http or https · <code>{"{s}"}</code> "s" for https links ·
+            <code>{"{rest}"}</code> the link without http:// or https://. Without a placeholder, the link is added to the end.
+          </p>
+          {#if s.browserTemplate.trim()}
+            {#if validTemplate(s.browserTemplate)}
+              <p class="example"><span class="sub">{EXAMPLE} opens as</span><code>{applyTemplate(s.browserTemplate, EXAMPLE)}</code></p>
+            {:else}
+              <p class="example warn">This needs to start with a URL scheme, such as <code>mybrowser:</code></p>
+            {/if}
+          {:else}
+            <p class="example sub">Until a template is entered, links open in the system default browser.</p>
+          {/if}
+        </div>
+      {/if}
     </section>
 
     <section class="about">
@@ -300,5 +360,34 @@
   }
   .about {
     padding-top: 16px;
+  }
+  .custom {
+    padding: 2px 0 8px;
+  }
+  .template {
+    width: 100%;
+    border: 1px solid var(--line-2);
+    background: var(--bg);
+    border-radius: 9px;
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 8px;
+  }
+  .template:focus {
+    border-color: var(--text-3);
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .example {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    font-size: 13px;
+    word-break: break-all;
   }
 </style>

@@ -87,7 +87,7 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
   - The full header (from, to, cc, date) opens with a tap.
   - Quoted history is collapsed behind `•••`.
   - HTML mail renders in a sandboxed frame and scales down if it's too wide.
-  - Inline images, a remote-image toggle, and link handling (http and mailto).
+  - Inline images, a remote-image toggle, and link handling (http and mailto), with a choice of browser for web links.
 - **Actions.**
   - Archive, delete, delete forever, empty Trash or Spam, restore, mark unread, mark unread from here.
   - Pin a conversation, move to a folder, apply labels, report spam, not spam.
@@ -127,6 +127,14 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
 
 Gmail has no pinning, so Carrier stores pins as a Gmail label named **Pinned**, created the first time you pin something in an account. Pins therefore sync between devices and show as that label in Gmail itself. Carrier hides the label from its Labels list and shows it as the *Pinned* mailbox instead. Notes and the order of pinned conversations are stored on the device, not in Gmail, so they don't sync between devices; pins made on another device appear below the ones you've placed, newest first. Pinning replaces starring: Carrier no longer stars or unstars, and existing stars are left as they are in Gmail (`is:starred` still finds them).
 
+### Default browser
+
+Settings › Links › Default browser chooses where web links in messages open: the system default, Safari, Chrome, Firefox, Microsoft Edge, Brave, DuckDuckGo or Orion, or a custom URL template.
+
+- **iPad.** Carrier rewrites the link into the browser's URL scheme, e.g. `googlechromes://…` or `firefox://open-url?url=…`. The browser has to be installed; if it can't be opened, the link opens in the default browser.
+- **Mac.** Most browsers don't register these schemes on macOS, so Carrier asks macOS to open the link in that app by name instead.
+- **Custom.** A template that works on both. `{url}` is the link percent-encoded, `{raw}` the link as is, `{scheme}` is `http` or `https`, `{s}` is `s` for https links, and `{rest}` is the link without `http://` or `https://`. A template without placeholders gets the link added to the end. Opera is not in the list because its current iOS scheme couldn't be confirmed; add it as a custom template if you know it.
+
 ### Markdown
 
 - The body is GitHub-flavoured Markdown: lists, tables, code, task lists and links.
@@ -161,6 +169,7 @@ src/
     app.svelte.ts            state + mailbox actions (optimistic, undoable)
     compose.svelte.ts        compose/reply/forward/drafts/undo-send
     settings.svelte.ts       persisted preferences
+    browser.ts               default browser: rewriting links into browser URL schemes
     platform.ts              Tauri vs browser: HTTP, Keychain, store, files, opener
     mail/
       auth.ts                Sign in with Google (system web sheet, OAuth + PKCE)

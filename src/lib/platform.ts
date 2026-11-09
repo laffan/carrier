@@ -107,10 +107,11 @@ export function cacheSet(key: string, value: unknown): void {
 
 // ---- system integration ---------------------------------------------------
 
-export async function openExternal(url: string): Promise<void> {
+/** Opens a URL outside the app; `openWith` names a macOS application. */
+export async function openExternal(url: string, openWith?: string): Promise<void> {
   if (isTauri) {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
+    await openUrl(url, openWith);
     return;
   }
   window.open(url, "_blank", "noopener");
@@ -138,6 +139,7 @@ export async function revealFile(path: string): Promise<void> {
   await revealItemInDir(path);
 }
 
+/** iPad/iPhone, including an iPad that reports itself as a Mac. */
 export const isIOS: boolean =
   typeof navigator !== "undefined" &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) ||

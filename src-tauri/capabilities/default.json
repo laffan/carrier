@@ -11,11 +11,13 @@
     {
       "identifier": "opener:allow-open-url",
       "allow": [
-        { "url": "https://*" },
-        { "url": "http://*" },
+        { "url": "https://*", "app": true },
+        { "url": "http://*", "app": true },
         { "url": "mailto:*" },
-        { "url": "tel:*" }
-      ]
+        { "url": "tel:*" },
+        { "url": "*:*" }
+      ],
+      "deny": [{ "url": "file:*" }]
     },
     "opener:allow-reveal-item-in-dir",
     {

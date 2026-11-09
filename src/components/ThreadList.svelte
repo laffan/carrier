@@ -116,10 +116,12 @@
   }
 
   function ontouchstart(e: TouchEvent) {
+    // Dragging a pinned row's handle is not a pull to refresh.
+    if ((e.target as Element | null)?.closest?.(".handle")) return;
     if (scroller && scroller.scrollTop <= 0 && !selecting) pullStart = e.touches[0].clientY;
   }
   function ontouchmove(e: TouchEvent) {
-    if (pullStart == null) return;
+    if (pullStart == null || drag) return;
     const dy = e.touches[0].clientY - pullStart;
     if (dy <= 0 || (scroller && scroller.scrollTop > 0)) {
       pull = 0;
@@ -146,9 +148,59 @@
   }
 
   const draftsMore = $derived(Math.max(0, app.draftsTotal - app.drafts.length));
-  // app.threads keeps pinned conversations first; they get their own section.
-  const pinnedRows = $derived(app.showsPinned ? app.threads.filter((t) => t.pinned) : []);
-  const restRows = $derived(app.showsPinned ? app.threads.filter((t) => !t.pinned) : app.threads);
+  // app.threads keeps pinned conversations first, in the user's order; they get their own section
+  // (headed everywhere except the Pinned mailbox, where every conversation is pinned).
+  const pinnedRows = $derived(app.threads.filter((t) => t.pinned));
+  const restRows = $derived(app.threads.filter((t) => !t.pinned));
+
+  // ---- reordering pinned conversations ------------------------------------
+
+  let pinnedBox = $state<HTMLDivElement>();
+  /** The drag in progress: which row, where it would land, and how far it has moved. */
+  let drag = $state<{ from: number; to: number; dy: number; height: number } | null>(null);
+
+  function startReorder(e: PointerEvent, index: number) {
+    if (!pinnedBox || drag) return;
+    const items = [...pinnedBox.children] as HTMLElement[];
+    const rects = items.map((el) => el.getBoundingClientRect());
+    const startY = e.clientY;
+    const startScroll = scroller?.scrollTop ?? 0;
+    drag = { from: index, to: index, dy: 0, height: rects[index].height };
+    const move = (ev: PointerEvent) => {
+      if (!drag || ev.pointerId !== e.pointerId) return;
+      ev.preventDefault();
+      const dy = ev.clientY - startY + ((scroller?.scrollTop ?? 0) - startScroll);
+      const centre = rects[index].top + rects[index].height / 2 + dy;
+      // The new index is the number of other rows whose middle is above the dragged row's middle.
+      const to = rects.filter((r, i) => i !== index && r.top + r.height / 2 < centre).length;
+      drag = { ...drag, dy, to };
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      const d = drag;
+      drag = null;
+      if (!d || d.to === d.from || ev.type === "pointercancel") return;
+      const keys = pinnedRows.map(threadKey);
+      const [moved] = keys.splice(d.from, 1);
+      keys.splice(d.to, 0, moved);
+      app.reorderPins(keys);
+    };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  }
+
+  /** How far a pinned row is displaced while another row is dragged over it. */
+  function shift(i: number): number {
+    if (!drag) return 0;
+    if (i === drag.from) return drag.dy;
+    if (drag.from < drag.to && i > drag.from && i <= drag.to) return -drag.height;
+    if (drag.to < drag.from && i >= drag.to && i < drag.from) return drag.height;
+    return 0;
+  }
   const showDrafts = $derived(app.showsDrafts && app.drafts.length > 0 && !selecting);
 
   async function openRow(t: (typeof app.threads)[number]) {
@@ -166,7 +218,7 @@
   }
 </script>
 
-{#snippet row(t: ThreadSummary)}
+{#snippet row(t: ThreadSummary, pinIndex = -1)}
   <ThreadRow
     thread={t}
     active={!!app.open && threadKey(app.open) === threadKey(t)}
@@ -182,6 +234,9 @@
     oncheck={() => toggleCheck(t)}
     onswipe={(a) => swipe(t, a)}
     onpin={() => app.togglePin([threadKey(t)])}
+    note={pinIndex >= 0 ? app.pinNote(threadKey(t)) : undefined}
+    onnote={pinIndex >= 0 ? (n) => app.setPinNote(threadKey(t), n) : undefined}
+    onreorder={pinIndex >= 0 && pinnedRows.length > 1 ? (e) => startReorder(e, pinIndex) : undefined}
   />
 {/snippet}
 
@@ -265,8 +320,14 @@
       <div class="empty"><p class="muted">{app.view.kind === "search" ? "No results" : `Nothing in ${app.viewTitle}`}</p></div>
     {:else}
       {#if pinnedRows.length}
-        <div class="section"><span>Pinned</span></div>
-        {#each pinnedRows as t (threadKey(t))}{@render row(t)}{/each}
+        {#if app.showsPinned}<div class="section"><span>Pinned</span></div>{/if}
+        <div class="pinned" class:dragging={!!drag} bind:this={pinnedBox}>
+          {#each pinnedRows as t, i (threadKey(t))}
+            <div class="pinitem" class:lifted={drag?.from === i} style:transform={drag ? `translate3d(0, ${shift(i)}px, 0)` : undefined}>
+              {@render row(t, i)}
+            </div>
+          {/each}
+        </div>
       {/if}
       {#if showDrafts}
         <div class="section">
@@ -426,6 +487,24 @@
     letter-spacing: 0;
     text-transform: none;
     color: var(--text-2);
+  }
+  .pinned {
+    position: relative;
+  }
+  .pinned.dragging {
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: grabbing;
+  }
+  .pinned.dragging .pinitem:not(.lifted) {
+    transition: transform 0.15s ease-out;
+  }
+  .pinitem.lifted {
+    position: relative;
+    z-index: 3;
+    box-shadow: var(--shadow);
+    border-radius: 10px;
+    overflow: hidden;
   }
   .sentinel {
     display: flex;

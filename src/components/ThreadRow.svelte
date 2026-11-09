@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Archive, Trash2, MailOpen, Mail, Pin, PinOff, Paperclip } from "@lucide/svelte";
+  import { Archive, Trash2, MailOpen, Mail, Pin, PinOff, Paperclip, GripVertical } from "@lucide/svelte";
   import type { ThreadSummary } from "../lib/mail/types";
   import type { SwipeAction } from "../lib/settings.svelte";
   import { listDate } from "../lib/util";
@@ -23,9 +23,14 @@
     oncheck: () => void;
     onswipe: (a: SwipeAction) => void;
     onpin: () => void;
+    /** Pinned rows: a private note shown in place of the snippet. */
+    note?: string;
+    onnote?: (note: string) => void;
+    /** Pinned rows: starts a drag on the handle to reorder. */
+    onreorder?: (e: PointerEvent) => void;
   }
 
-  let { thread, active, checked, selecting, showAccount, color, sentView, draftView = false, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onpin }: Props = $props();
+  let { thread, active, checked, selecting, showAccount, color, sentView, draftView = false, swipeLeft, swipeRight, removes, onopen, oncheck, onswipe, onpin, note = "", onnote, onreorder }: Props = $props();
 
   let row: HTMLDivElement;
   let dx = $state(0);
@@ -133,9 +138,33 @@
     return (ps.length > 3 ? "… " : "") + shown.map((p) => (p.isMe ? "me" : (p.name || p.email).split(/[\s@]/)[0])).join(", ");
   });
 
+  /** Pinned rows show a note field instead of the snippet, and a drag handle. */
+  const pinnedRow = $derived(thread.pinned && !!onnote && !draftView);
+
+  /** Keeps taps in the note field and on the handle from opening, selecting or swiping the row. */
+  function own(e: Event) {
+    e.stopPropagation();
+  }
+
   const LeftIcon = $derived(icon(swipeRight));
   const RightIcon = $derived(icon(swipeLeft));
 </script>
+
+{#snippet pinButton()}
+  <button
+    class="pin"
+    class:on={thread.pinned}
+    aria-label={thread.pinned ? "Unpin" : "Pin"}
+    title={thread.pinned ? "Unpin" : "Pin to top"}
+    onpointerdown={(e) => e.stopPropagation()}
+    onclick={(e) => {
+      e.stopPropagation();
+      onpin();
+    }}
+  >
+    <Pin size={15} strokeWidth={1.7} fill={thread.pinned ? "currentColor" : "none"} />
+  </button>
+{/snippet}
 
 <div
   class="wrap"
@@ -188,22 +217,48 @@
       <div class="line2">
         <span class="subject">{(draftView ? thread.draft?.subject : thread.subject) || "(no subject)"}</span>
         {#if thread.hasAttachments}<span class="clip"><Paperclip size={13} strokeWidth={1.8} /></span>{/if}
+        {#if pinnedRow}{@render pinButton()}{/if}
       </div>
       <div class="line3">
-        <span class="snippet">{draftView ? thread.draft?.snippet || "" : thread.snippet}</span>
-        {#if !draftView}<button
-          class="pin"
-          class:on={thread.pinned}
-          aria-label={thread.pinned ? "Unpin" : "Pin"}
-          title={thread.pinned ? "Unpin" : "Pin to top"}
-          onpointerdown={(e) => e.stopPropagation()}
-          onclick={(e) => {
-            e.stopPropagation();
-            onpin();
-          }}
-        >
-          <Pin size={15} strokeWidth={1.7} fill={thread.pinned ? "currentColor" : "none"} />
-        </button>{/if}
+        {#if pinnedRow}
+          <input
+            class="note"
+            type="text"
+            value={note}
+            placeholder="Add a note…"
+            aria-label="Note (only you see this)"
+            title="A private reminder, not part of the email"
+            enterkeyhint="done"
+            autocomplete="off"
+            onpointerdown={own}
+            onclick={own}
+            oncontextmenu={own}
+            oninput={(e) => onnote?.(e.currentTarget.value)}
+            onkeydown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
+            }}
+          />
+          {#if onreorder && !selecting}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span
+              class="handle"
+              title="Drag to reorder"
+              aria-hidden="true"
+              onpointerdown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onreorder?.(e);
+              }}
+              onclick={own}
+            >
+              <GripVertical size={15} strokeWidth={1.7} />
+            </span>
+          {/if}
+        {:else}
+          <span class="snippet">{draftView ? thread.draft?.snippet || "" : thread.snippet}</span>
+          {#if !draftView}{@render pinButton()}{/if}
+        {/if}
       </div>
       {#if showAccount}<div class="acct">{thread.account}</div>{/if}
     </div>
@@ -422,6 +477,44 @@
   }
   .pin.on {
     color: var(--pin);
+  }
+  .note {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    margin: 1px 0 0 -6px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 6px;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    color: var(--text-2);
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .note::placeholder {
+    color: var(--text-3);
+  }
+  .note:hover,
+  .note:focus {
+    background: var(--bg-2);
+  }
+  .note:focus {
+    color: var(--text);
+  }
+  .handle {
+    display: flex;
+    padding: 2px;
+    margin: 0 -2px 0 0;
+    color: var(--text-3);
+    cursor: grab;
+    touch-action: none;
+  }
+  .handle:active {
+    cursor: grabbing;
   }
   .acct {
     font-size: 11px;

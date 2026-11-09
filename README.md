@@ -75,6 +75,7 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
 - **Mailboxes.** Primary, Social, Promotions, Updates, Forums, Pinned, Important, Sent, Drafts, All mail, Spam, Trash and your Gmail labels, with unread counts. Settings › Inbox type switches between Primary and Everything.
 - **List.**
   - Pinned conversations sit at the top of every list in a Pinned section, above the Inbox's Drafts section. Pin one with the pin icon on its row or in the conversation's toolbar.
+  - A pinned row shows the sender and subject, and in place of the snippet a field for an optional note: a private reminder of why it's pinned, never added to the email. Drag the handle below the pin to reorder pinned conversations.
   - Inbox opens with a Drafts section (latest 5 drafts across the accounts in view, with a link to the rest); tapping one reopens it in compose.
   - Conversations, with participants, message counts, a draft marker, attachment indicator and pin.
   - Pull to refresh, infinite scroll, and a refresh every 60 seconds while the app is visible.
@@ -124,7 +125,7 @@ Set your signing team in `src-tauri/tauri.conf.json` under `bundle.iOS.developme
 
 ### Pinning
 
-Gmail has no pinning, so Carrier stores pins as a Gmail label named **Pinned**, created the first time you pin something in an account. Pins therefore sync between devices and show as that label in Gmail itself. Carrier hides the label from its Labels list and shows it as the *Pinned* mailbox instead. Pinning replaces starring: Carrier no longer stars or unstars, and existing stars are left as they are in Gmail (`is:starred` still finds them).
+Gmail has no pinning, so Carrier stores pins as a Gmail label named **Pinned**, created the first time you pin something in an account. Pins therefore sync between devices and show as that label in Gmail itself. Carrier hides the label from its Labels list and shows it as the *Pinned* mailbox instead. Notes and the order of pinned conversations are stored on the device, not in Gmail, so they don't sync between devices; pins made on another device appear below the ones you've placed, newest first. Pinning replaces starring: Carrier no longer stars or unstars, and existing stars are left as they are in Gmail (`is:starred` still finds them).
 
 ### Markdown
 

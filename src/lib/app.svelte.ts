@@ -51,11 +51,6 @@ function splitKey(key: string): { account: string; id: string } {
   return { account: key.slice(0, i), id: key.slice(i + 1) };
 }
 
-/** Pinned conversations first, then newest first. */
-function byPinThenDate(a: ThreadSummary, b: ThreadSummary): number {
-  return Number(b.pinned) - Number(a.pinned) || b.date - a.date;
-}
-
 const PAGE = 30;
 /** Most pinned conversations fetched per account for the top of a list. */
 const PINNED_MAX = 50;
@@ -87,6 +82,14 @@ class App {
   threadLoading = $state(false);
   threadError = $state<string | null>(null);
 
+  /**
+   * Private notes on pinned conversations and their hand-sorted order, keyed
+   * by threadKey. Kept on this device only; never part of any email.
+   */
+  pinNotes = $state<Record<string, string>>({});
+  pinOrder = $state<string[]>([]);
+  private pinsTimer: ReturnType<typeof setTimeout> | undefined;
+
   selection = new SvelteSet<string>();
   sidebarOpen = $state(false);
 
@@ -99,6 +102,9 @@ class App {
 
   async init() {
     await settings.load();
+    const pins = await kvGet<{ notes?: Record<string, string>; order?: string[] }>("pins");
+    this.pinNotes = pins?.notes ?? {};
+    this.pinOrder = pins?.order ?? [];
     if (isTauri && (await kvGet<boolean>("demo"))) this.demo = true;
     if (this.demo) {
       this.loadDemoAccounts();
@@ -434,7 +440,7 @@ class App {
     });
     if (failures && failures === results.length) throw (results[0] as PromiseRejectedResult).reason;
     this.hasMore = accounts.some((a) => this.pageTokens.get(a));
-    return out.sort(byPinThenDate);
+    return this.sortThreads(out);
   }
 
   /** Pull-to-refresh / periodic refresh: keeps already-loaded pages. */
@@ -481,13 +487,51 @@ class App {
       if (gen !== this.generation) return;
       const seen = new Set(this.threads.map(threadKey));
       const more = pages.flat().filter((t) => !seen.has(threadKey(t)));
-      this.threads = [...this.threads, ...more].sort(byPinThenDate);
+      this.threads = this.sortThreads([...this.threads, ...more]);
       this.hasMore = this.accountsInView.some((a) => this.pageTokens.get(a));
     } catch (e) {
       this.handleError(e);
     } finally {
       this.loadingMore = false;
     }
+  }
+
+  // ---- pins ---------------------------------------------------------------
+
+  /**
+   * Pinned conversations first, in the user's order (pins without a place,
+   * e.g. made on another device, follow, newest first); then newest first.
+   */
+  private sortThreads(list: ThreadSummary[]): ThreadSummary[] {
+    const rank = new Map(this.pinOrder.map((k, i) => [k, i]));
+    const r = (t: ThreadSummary) => rank.get(threadKey(t)) ?? Number.MAX_SAFE_INTEGER;
+    return list.sort((a, b) => Number(b.pinned) - Number(a.pinned) || (a.pinned ? r(a) - r(b) : 0) || b.date - a.date);
+  }
+
+  private savePins(delay = 0) {
+    clearTimeout(this.pinsTimer);
+    this.pinsTimer = setTimeout(() => kvSet("pins", { notes: $state.snapshot(this.pinNotes), order: $state.snapshot(this.pinOrder) }), delay);
+  }
+
+  pinNote(key: string): string {
+    return this.pinNotes[key] ?? "";
+  }
+
+  setPinNote(key: string, note: string) {
+    if (note.trim()) this.pinNotes[key] = note;
+    else delete this.pinNotes[key];
+    this.savePins(400);
+  }
+
+  /** Applies a new order to the given pinned conversations, keeping other pins' places. */
+  reorderPins(keys: string[]) {
+    const missing = keys.filter((k) => !this.pinOrder.includes(k));
+    const order = [...this.pinOrder, ...missing];
+    const moved = new Set(keys);
+    let i = 0;
+    this.pinOrder = order.map((k) => (moved.has(k) ? keys[i++] : k));
+    this.threads = this.sortThreads([...this.threads]);
+    this.savePins();
   }
 
   // ---- conversation -------------------------------------------------------
@@ -565,7 +609,7 @@ class App {
       this.summaries(t.account).set(t.id, next);
       return next;
     });
-    this.threads = repins ? patched.sort(byPinThenDate) : patched;
+    this.threads = repins ? this.sortThreads(patched) : patched;
     if (this.thread && set.has(threadKey(this.thread))) {
       const fix = (ids: string[]) => [...ids.filter((l) => !remove.includes(l)), ...add.filter((l) => !ids.includes(l))];
       this.thread = {
@@ -736,6 +780,9 @@ class App {
 
   /** Pins or unpins conversations (a thread-wide label, so it survives new replies). */
   setPin(keys: string[], on: boolean) {
+    // Newly pinned conversations go to the top; notes are kept in case of a re-pin.
+    this.pinOrder = [...(on ? keys : []), ...this.pinOrder.filter((k) => !keys.includes(k))];
+    this.savePins();
     return on ? this.modify(keys, ["PINNED"], [], undefined, false) : this.modify(keys, [], ["PINNED"], undefined, false);
   }
 

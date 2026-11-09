@@ -17,7 +17,7 @@ export interface BrowserPreset {
   name: string;
   /** URL template on iPad (empty: no rewrite). */
   template: string;
-  /** Application name on macOS. */
+  /** Application name on macOS. Without one, the template is used on macOS too. */
   macApp?: string;
 }
 
@@ -31,6 +31,8 @@ export const BROWSERS: BrowserPreset[] = [
   { id: "brave", name: "Brave", template: "brave://open-url?url={url}", macApp: "Brave Browser" },
   { id: "duckduckgo", name: "DuckDuckGo", template: "ddgQuickLink://{raw}", macApp: "DuckDuckGo" },
   { id: "orion", name: "Orion", template: "orion://open-url?url={url}", macApp: "Orion" },
+  // Also accepts snorkle://open-url?url={url} and snorkle://{rest} (https only); this form keeps http links on http.
+  { id: "snorkle", name: "Snorkle", template: "snorkle-{scheme}://{rest}" },
 ];
 
 export const CUSTOM_BROWSER = "custom";
@@ -71,6 +73,6 @@ export function browserTarget(
   }
   const preset = BROWSERS.find((b) => b.id === choice.browser);
   if (!preset || preset.id === "system") return { url: link };
-  if (mac) return { url: link, openWith: preset.macApp };
+  if (mac && preset.macApp) return { url: link, openWith: preset.macApp };
   return { url: applyTemplate(preset.template, link) };
 }

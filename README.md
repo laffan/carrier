@@ -129,10 +129,11 @@ Gmail has no pinning, so Carrier stores pins as a Gmail label named **Pinned**, 
 
 ### Default browser
 
-Settings › Links › Default browser chooses where web links in messages open: the system default, Safari, Chrome, Firefox, Microsoft Edge, Brave, DuckDuckGo or Orion, or a custom URL template.
+Settings › Links › Default browser chooses where web links in messages open: the system default, Safari, Chrome, Firefox, Microsoft Edge, Brave, DuckDuckGo, Orion or Snorkle, or a custom URL template.
 
 - **iPad.** Carrier rewrites the link into the browser's URL scheme, e.g. `googlechromes://…` or `firefox://open-url?url=…`. The browser has to be installed; if it can't be opened, the link opens in the default browser.
-- **Mac.** Most browsers don't register these schemes on macOS, so Carrier asks macOS to open the link in that app by name instead.
+- **Mac.** Most browsers don't register these schemes on macOS, so Carrier asks macOS to open the link in that app by name instead. Snorkle has no app name set, so on a Mac it uses its scheme as on iPad.
+- **Snorkle** links are rewritten as `snorkle-https://…` (or `snorkle-http://…`), which keeps http links on http. Snorkle also accepts `snorkle://open-url?url=<encoded link>` and the https-only shorthand `snorkle://example.com/page`; either can be used as a custom template.
 - **Custom.** A template that works on both. `{url}` is the link percent-encoded, `{raw}` the link as is, `{scheme}` is `http` or `https`, `{s}` is `s` for https links, and `{rest}` is the link without `http://` or `https://`. A template without placeholders gets the link added to the end. Opera is not in the list because its current iOS scheme couldn't be confirmed; add it as a custom template if you know it.
 
 ### Markdown

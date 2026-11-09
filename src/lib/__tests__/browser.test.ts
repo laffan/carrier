@@ -14,6 +14,8 @@ describe("browser templates", () => {
     expect(applyTemplate(template("brave"), link)).toBe("brave://open-url?url=" + encodeURIComponent(link));
     expect(applyTemplate(template("orion"), link)).toBe("orion://open-url?url=" + encodeURIComponent(link));
     expect(applyTemplate(template("duckduckgo"), "https://example.com/")).toBe("ddgQuickLink://https://example.com/");
+    expect(applyTemplate(template("snorkle"), "https://example.com/page")).toBe("snorkle-https://example.com/page");
+    expect(applyTemplate(template("snorkle"), "http://example.com/page")).toBe("snorkle-http://example.com/page");
   });
 
   it("treats a template without placeholders as a prefix", () => {
@@ -36,6 +38,10 @@ describe("browserTarget", () => {
   it("rewrites on iPad and names the app on a Mac", () => {
     expect(browserTarget(url, { browser: "chrome", browserTemplate: "" }, false)).toEqual({ url: "googlechromes://example.com/" });
     expect(browserTarget(url, { browser: "chrome", browserTemplate: "" }, true)).toEqual({ url, openWith: "Google Chrome" });
+  });
+
+  it("uses the scheme on a Mac when a browser has no app name", () => {
+    expect(browserTarget(url, { browser: "snorkle", browserTemplate: "" }, true)).toEqual({ url: "snorkle-https://example.com/" });
   });
 
   it("uses the system default when nothing applies", () => {
